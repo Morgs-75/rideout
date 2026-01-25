@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Trophy, Crown, Users, Route, ChevronRight, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getLeaderboard, getUserPoints } from '../services/pointsService';
+import { getLeaderboard, getUserPoints, initUserPoints } from '../services/pointsService';
 import { GAMIFICATION_CONFIG, getTier, formatPoints } from '../config/gamification';
 
 const Leaderboard = () => {
@@ -46,10 +46,13 @@ const Leaderboard = () => {
 
   const fetchUserPoints = async () => {
     try {
+      // Initialize points for user if they don't exist
+      await initUserPoints(user.uid);
       const points = await getUserPoints(user.uid);
       setUserPoints(points);
     } catch (error) {
       console.error('Error fetching user points:', error);
+      setUserPoints({ totalPoints: 0, lifetimePoints: 0, tier: 'Rider' });
     }
   };
 

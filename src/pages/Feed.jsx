@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Bell, RefreshCw, Calendar, ChevronRight, UserPlus, Send, Search, X, UserCheck } from 'lucide-react';
+import { Zap, Bell, RefreshCw, Calendar, ChevronRight, UserPlus, Send, Search, X, UserCheck, Trophy } from 'lucide-react';
 import {
   collection,
   query,
@@ -263,6 +263,12 @@ const Feed = () => {
             >
               <Search size={24} />
             </button>
+            <Link
+              to="/leaderboard"
+              className="p-2 text-yellow-500 rounded-full hover:bg-dark-card transition-all"
+            >
+              <Trophy size={22} />
+            </Link>
             <button
               onClick={() => setShowInvite(true)}
               className="p-2 text-gray-400 hover:text-neon-green rounded-full hover:bg-dark-card transition-all"

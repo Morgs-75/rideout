@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
-import { Home, Map, PlusSquare, MessageCircle, User, Search, X, UserPlus, UserCheck, Trophy } from 'lucide-react';
+import { Home, Map, PlusSquare, MessageCircle, User, Search, X, UserPlus, UserCheck } from 'lucide-react';
 import { collection, query, getDocs, where, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -91,26 +91,6 @@ const Layout = () => {
       <main className="pb-20">
         <Outlet />
       </main>
-
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-3">
-        {/* Leaderboard Button */}
-        <Link
-          to="/leaderboard"
-          className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg"
-          style={{ boxShadow: '0 0 20px rgba(245, 158, 11, 0.5)' }}
-        >
-          <Trophy size={24} className="text-dark-bg" />
-        </Link>
-        {/* Search Button */}
-        <button
-          onClick={openSearch}
-          className="w-14 h-14 bg-gradient-to-r from-neon-blue to-neon-green rounded-full flex items-center justify-center shadow-lg"
-          style={{ boxShadow: '0 0 20px rgba(0, 212, 255, 0.5)' }}
-        >
-          <Search size={24} className="text-dark-bg" />
-        </button>
-      </div>
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-dark-card/95 backdrop-blur-lg border-t border-dark-border safe-bottom z-50">
