@@ -65,7 +65,39 @@ const BiometricLock = ({ children }) => {
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
 
-      // Try to authenticate
+      // Check if we have a stored credential
+      const storedCredentialId = localStorage.getItem('biometricCredentialId');
+
+      if (storedCredentialId) {
+        // Use existing credential - this triggers Face ID without "Add Passkey" prompt
+        try {
+          const credentialIdArray = Uint8Array.from(atob(storedCredentialId), c => c.charCodeAt(0));
+          const assertion = await navigator.credentials.get({
+            publicKey: {
+              challenge,
+              allowCredentials: [{
+                id: credentialIdArray,
+                type: 'public-key',
+                transports: ['internal']
+              }],
+              userVerification: 'required',
+              timeout: 60000
+            }
+          });
+
+          if (assertion) {
+            setIsLocked(false);
+            localStorage.setItem('lastActiveTime', Date.now().toString());
+            return;
+          }
+        } catch (getErr) {
+          console.log('Get credential failed, will create new one:', getErr);
+          // If get fails, fall through to create new credential
+          localStorage.removeItem('biometricCredentialId');
+        }
+      }
+
+      // Create new credential (only happens once or if previous was deleted)
       const credential = await navigator.credentials.create({
         publicKey: {
           challenge,
@@ -91,6 +123,9 @@ const BiometricLock = ({ children }) => {
       });
 
       if (credential) {
+        // Store credential ID for future authentication
+        const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+        localStorage.setItem('biometricCredentialId', credentialId);
         setIsLocked(false);
         localStorage.setItem('lastActiveTime', Date.now().toString());
       }
