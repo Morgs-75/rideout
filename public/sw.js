@@ -1,5 +1,5 @@
-// Service Worker v1.0.1 - Force update
-const VERSION = '1.0.1';
+// Service Worker v1.0.2 - Force update
+const VERSION = '1.0.2';
 
 self.addEventListener('install', (event) => {
   // Take control immediately

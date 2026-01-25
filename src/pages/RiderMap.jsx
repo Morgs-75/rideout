@@ -15,7 +15,7 @@ import {
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoidHJveW03IiwiYSI6ImNta3M3bGw1azFiamEza3BweDJpMGswa3kifQ.P8EVLVOr4ChTrpkyCIg36A';
@@ -360,19 +360,33 @@ const RiderMap = () => {
     });
   }, [alerts, mapReady]);
 
-  // Filter expired alerts
+  // Subscribe to alerts from Firebase
   useEffect(() => {
-    const filterExpiredAlerts = () => {
-      const now = Date.now();
-      setAlerts(prev => prev.filter(alert => {
-        const expiresIn = ALERT_TYPES[alert.type]?.expiresIn || 60 * 60 * 1000;
-        return (now - alert.time) < expiresIn;
-      }));
-    };
+    const alertsRef = collection(db, 'alerts');
 
-    filterExpiredAlerts();
-    const interval = setInterval(filterExpiredAlerts, 60 * 1000);
-    return () => clearInterval(interval);
+    const unsubscribe = onSnapshot(alertsRef, (snapshot) => {
+      const now = Date.now();
+      const alertsData = [];
+
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const alertTime = data.time?.toDate?.()?.getTime() || data.time || 0;
+        const expiresIn = ALERT_TYPES[data.type]?.expiresIn || 60 * 60 * 1000;
+
+        // Only include non-expired alerts
+        if ((now - alertTime) < expiresIn) {
+          alertsData.push({
+            id: doc.id,
+            ...data,
+            time: alertTime
+          });
+        }
+      });
+
+      setAlerts(alertsData);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Play siren for new police alerts within 5km
@@ -400,7 +414,7 @@ const RiderMap = () => {
     });
   }, [alerts, userLocation]);
 
-  const createAlert = (type) => {
+  const createAlert = async (type) => {
     if (!userLocation) {
       setNotificationMessage('Enable location to report');
       setShowNotification(true);
@@ -408,28 +422,48 @@ const RiderMap = () => {
       return;
     }
 
-    const newAlert = {
-      id: `alert-${Date.now()}`,
-      type,
-      lat: userLocation[0],
-      lng: userLocation[1],
-      reporter: userProfile?.streetName || 'VoltRider',
-      time: Date.now(),
-      confirmations: 1
-    };
+    try {
+      await addDoc(collection(db, 'alerts'), {
+        type,
+        lat: userLocation[0],
+        lng: userLocation[1],
+        reporter: userProfile?.streetName || 'VoltRider',
+        reporterId: user?.uid,
+        time: serverTimestamp(),
+        confirmations: 1
+      });
 
-    setAlerts(prev => [newAlert, ...prev]);
-    setNotificationMessage(`${ALERT_TYPES[type].emoji} Alert sent to nearby riders!`);
-    setShowNotification(true);
-    setTimeout(() => setShowNotification(false), 4000);
+      setNotificationMessage(`${ALERT_TYPES[type].emoji} Alert sent to nearby riders!`);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 4000);
+    } catch (error) {
+      console.error('Error creating alert:', error);
+      setNotificationMessage('Failed to send alert');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    }
   };
 
-  const confirmAlert = (id) => {
-    setAlerts(prev => prev.map(a => a.id === id ? { ...a, confirmations: a.confirmations + 1 } : a));
+  const confirmAlert = async (id) => {
+    try {
+      const alertRef = doc(db, 'alerts', id);
+      const alert = alerts.find(a => a.id === id);
+      if (alert) {
+        await updateDoc(alertRef, {
+          confirmations: (alert.confirmations || 1) + 1
+        });
+      }
+    } catch (error) {
+      console.error('Error confirming alert:', error);
+    }
   };
 
-  const dismissAlert = (id) => {
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  const dismissAlert = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'alerts', id));
+    } catch (error) {
+      console.error('Error dismissing alert:', error);
+    }
   };
 
   const timeAgo = (ts) => {
