@@ -39,7 +39,7 @@ const EditProfile = () => {
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
 
-        await navigator.credentials.create({
+        const credential = await navigator.credentials.create({
           publicKey: {
             challenge,
             rp: { name: 'RideOut', id: window.location.hostname },
@@ -60,6 +60,12 @@ const EditProfile = () => {
           }
         });
 
+        // Store the credential ID for future authentication
+        if (credential) {
+          const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+          localStorage.setItem('biometricCredentialId', credentialId);
+        }
+
         setBiometricLock(true);
         setBiometricEnabled(true);
       } catch (err) {
@@ -67,7 +73,8 @@ const EditProfile = () => {
         alert('Could not enable Face ID. Please try again.');
       }
     } else {
-      // Disabling
+      // Disabling - also remove stored credential
+      localStorage.removeItem('biometricCredentialId');
       setBiometricLock(false);
       setBiometricEnabled(false);
     }

@@ -156,6 +156,7 @@ const RiderMap = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(14);
   const seenAlertIds = useRef(new Set());
 
   const MAP_STYLES = {
@@ -254,6 +255,11 @@ const RiderMap = () => {
       map.current.on('load', () => {
         setMapReady(true);
       });
+
+      // Listen to zoom changes to resize markers
+      map.current.on('zoom', () => {
+        setZoomLevel(map.current.getZoom());
+      });
     };
 
     const initLocation = async () => {
@@ -326,11 +332,50 @@ const RiderMap = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [user]);
 
-  // Fetch riders periodically
+  // Subscribe to riders in real-time
   useEffect(() => {
-    fetchRiders();
-    const interval = setInterval(fetchRiders, 30000);
-    return () => clearInterval(interval);
+    if (!user?.uid) return;
+
+    const usersRef = collection(db, 'users');
+    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+      // Store all users for search
+      const allUsersData = snapshot.docs
+        .filter(d => d.id !== user.uid)
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            streetName: data.streetName || 'Rider',
+            bike: data.bike || 'Electric Rider',
+            avatar: data.avatar,
+            lastLocation: data.lastLocation
+          };
+        });
+      setAllUsers(allUsersData);
+
+      // Filter to only those with location for map display
+      const ridersData = snapshot.docs
+        .filter(d => d.id !== user.uid && d.data().lastLocation)
+        .map(d => {
+          const data = d.data();
+          const lastSeen = data.lastLocationTime?.toDate?.() || new Date(0);
+          const isOnline = (Date.now() - lastSeen.getTime()) < 15 * 60 * 1000;
+          return {
+            id: d.id,
+            streetName: data.streetName || 'Rider',
+            lat: data.lastLocation.lat,
+            lng: data.lastLocation.lng,
+            bike: data.bike || 'Electric Rider',
+            avatar: data.avatar || null,
+            online: isOnline
+          };
+        });
+      setRiders(ridersData);
+    }, (error) => {
+      console.error('Error subscribing to riders:', error);
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   // Update user location marker
@@ -369,24 +414,32 @@ const RiderMap = () => {
       }
     });
 
+    // Calculate marker size based on zoom level
+    const zoom = map.current.getZoom();
+    const baseSize = Math.max(30, Math.min(60, 20 + zoom * 3)); // Scale from 30px to 60px
+    const fontSize = Math.max(8, Math.min(14, 6 + zoom * 0.5));
+    const emojiSize = Math.max(14, Math.min(24, 10 + zoom * 1));
+    const labelWidth = Math.max(50, Math.min(80, 40 + zoom * 2));
+
     // Add new rider markers
     riders.forEach(rider => {
       const el = document.createElement('div');
+      el.className = 'rider-marker';
       const isOnline = rider.online;
       const avatarContent = rider.avatar
         ? `<img src="${rider.avatar}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />`
-        : `<span style="font-size: 20px;">⚡🏍️</span>`;
+        : `<span style="font-size: ${emojiSize}px;">⚡🏍️</span>`;
       el.innerHTML = `
         <div style="position: relative; cursor: pointer;">
-          <div style="width: 50px; height: 50px; background: ${isOnline ? 'linear-gradient(135deg, #00D4FF, #39FF14)' : '#666'}; border-radius: 50%; padding: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+          <div style="width: ${baseSize}px; height: ${baseSize}px; background: ${isOnline ? 'linear-gradient(135deg, #00D4FF, #39FF14)' : '#666'}; border-radius: 50%; padding: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s ease;">
             <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
               ${avatarContent}
             </div>
           </div>
-          <div style="position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); background: ${isOnline ? '#00D4FF' : '#666'}; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis;">
+          <div style="position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); background: ${isOnline ? '#00D4FF' : '#666'}; color: #000; font-size: ${fontSize}px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap; max-width: ${labelWidth}px; overflow: hidden; text-overflow: ellipsis;">
             ${rider.streetName}
           </div>
-          ${isOnline ? '<div style="position: absolute; top: 0; right: 0; width: 12px; height: 12px; background: #39FF14; border-radius: 50%; border: 2px solid #1a1a1a;"></div>' : ''}
+          ${isOnline ? `<div style="position: absolute; top: 0; right: 0; width: ${baseSize * 0.24}px; height: ${baseSize * 0.24}px; background: #39FF14; border-radius: 50%; border: 2px solid #1a1a1a;"></div>` : ''}
         </div>
       `;
 
@@ -403,7 +456,7 @@ const RiderMap = () => {
         .setPopup(popup)
         .addTo(map.current);
     });
-  }, [riders, mapReady]);
+  }, [riders, mapReady, zoomLevel]);
 
   // Update alert markers
   useEffect(() => {

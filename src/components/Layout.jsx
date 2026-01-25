@@ -1,10 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { Home, Map, PlusSquare, MessageCircle, User, Search, X, UserPlus, UserCheck } from 'lucide-react';
-import { collection, query, getDocs, where, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, deleteDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
+
+// Update user's location in Firebase
+const updateUserLocation = async (userId, lat, lng) => {
+  if (!userId) return;
+  try {
+    await updateDoc(doc(db, 'users', userId), {
+      lastLocation: { lat, lng },
+      lastLocationTime: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating location:', error);
+  }
+};
 
 const Layout = () => {
   const { user } = useAuth();
@@ -12,6 +25,39 @@ const Layout = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState([]);
   const [followingIds, setFollowingIds] = useState([]);
+
+  // Track user location in background (like Snap Map)
+  useEffect(() => {
+    if (!user?.uid || !navigator.geolocation) return;
+
+    // Check if user has location sharing enabled
+    const locationEnabled = localStorage.getItem('locationSharing') !== 'false';
+    if (!locationEnabled) return;
+
+    let lastUpdate = 0;
+    const MIN_UPDATE_INTERVAL = 30000; // Update at most every 30 seconds
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const now = Date.now();
+        // Throttle updates to avoid too many Firebase writes
+        if (now - lastUpdate > MIN_UPDATE_INTERVAL) {
+          updateUserLocation(user.uid, position.coords.latitude, position.coords.longitude);
+          lastUpdate = now;
+        }
+      },
+      (error) => {
+        console.log('Location error:', error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60000,
+        timeout: 10000
+      }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user]);
 
   const fetchAllUsers = async () => {
     try {
