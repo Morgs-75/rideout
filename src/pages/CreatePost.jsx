@@ -8,6 +8,7 @@ import { storage, db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { demoPosts } from '../utils/demoStore';
 import LocationPicker from '../components/LocationPicker';
+import { awardPostCreated } from '../services/pointsService';
 
 const CreatePost = () => {
   const { user, userProfile, isDemo } = useAuth();
@@ -120,6 +121,8 @@ const CreatePost = () => {
         // Save to Firebase
         postData.createdAt = serverTimestamp();
         await addDoc(collection(db, 'posts'), postData);
+        // Award points for creating post
+        awardPostCreated(user.uid);
       }
 
       navigate('/feed');

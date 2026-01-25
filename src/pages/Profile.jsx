@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Grid, MessageCircle, UserPlus, UserMinus, MapPin } from 'lucide-react';
+import { Settings, Grid, MessageCircle, UserPlus, UserMinus, MapPin, Zap, TrendingUp } from 'lucide-react';
 import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, deleteDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
+import { getUserPoints } from '../services/pointsService';
+import { getTier, getProgressToNextTier, getNextTier, formatPoints } from '../config/gamification';
 
 const Profile = () => {
   const { userId } = useParams();
@@ -15,14 +17,25 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [userPoints, setUserPoints] = useState(null);
 
   const isOwnProfile = user?.uid === userId;
 
   useEffect(() => {
     fetchProfile();
     fetchPosts();
+    fetchPoints();
     if (!isOwnProfile && user) checkFollowStatus();
   }, [userId, user]);
+
+  const fetchPoints = async () => {
+    try {
+      const points = await getUserPoints(userId);
+      setUserPoints(points);
+    } catch (error) {
+      console.error('Error fetching points:', error);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -109,6 +122,49 @@ const Profile = () => {
             </div>
           </div>
         </div>
+
+        {/* Tier & Points */}
+        {userPoints && (() => {
+          const tier = getTier(userPoints.lifetimePoints || 0);
+          const nextTier = getNextTier(userPoints.lifetimePoints || 0);
+          const progress = getProgressToNextTier(userPoints.lifetimePoints || 0);
+          return (
+            <div className="mb-4 p-3 bg-dark-card rounded-xl border border-dark-border">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium"
+                    style={{ backgroundColor: `${tier.color}20`, color: tier.color }}
+                  >
+                    <span>{tier.icon}</span>
+                    <span>{tier.name}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-neon-green">
+                  <Zap size={16} />
+                  <span className="font-bold">{formatPoints(userPoints.lifetimePoints || 0)}</span>
+                  <span className="text-xs text-gray-500">pts</span>
+                </div>
+              </div>
+              {nextTier && (
+                <div className="space-y-1">
+                  <div className="h-1.5 bg-dark-surface rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      className="h-full rounded-full"
+                      style={{ background: `linear-gradient(90deg, ${tier.color}, ${nextTier.color})` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>{formatPoints(nextTier.min - (userPoints.lifetimePoints || 0))} pts to {nextTier.name}</span>
+                    <span className="flex items-center gap-1"><TrendingUp size={10} />{progress}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Bio & Bike */}
         {profile?.bio && <p className="text-sm mb-2">{profile.bio}</p>}

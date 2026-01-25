@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, AtSign, Check, X } from 'lucide-react';
+import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, AtSign, Check, X, Users } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
+import { awardRegistrationPoints } from '../services/pointsService';
 
 const SignUp = () => {
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [streetName, setStreetName] = useState('');
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,7 +84,9 @@ const SignUp = () => {
 
     try {
       console.log('Starting signup with:', { email, streetName });
-      await signUp(email, password, streetName);
+      const newUser = await signUp(email, password, streetName, '', '', '', referralCode);
+      // Award registration points
+      await awardRegistrationPoints(newUser.uid, referralCode || null);
       console.log('Signup successful, navigating to onboarding');
       navigate('/onboarding');
     } catch (err) {
@@ -221,6 +226,19 @@ const SignUp = () => {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm password"
               required
+              className="w-full pl-12 pr-4 py-4 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all"
+            />
+          </div>
+
+          {/* Referral Code (optional) */}
+          <div className="relative">
+            <Users size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              placeholder="Referral code (optional)"
+              maxLength={8}
               className="w-full pl-12 pr-4 py-4 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all"
             />
           </div>

@@ -22,6 +22,7 @@ import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { demoPosts } from '../utils/demoStore';
 import { notifyLike, notifyUpvote, notifyFollow } from '../utils/notifications';
+import { awardLikeReceived, awardUpvoteReceived, awardCommentGiven } from '../services/pointsService';
 
 const PostCard = ({ post, onReport, onUpdate }) => {
   const { user, userProfile, isDemo } = useAuth();
@@ -175,6 +176,8 @@ const PostCard = ({ post, onReport, onUpdate }) => {
         // Send notification when liking (not unliking)
         if (post.userId !== user.uid) {
           notifyLike(post.userId, { uid: user.uid, streetName: userProfile?.streetName, avatar: userProfile?.avatar }, post);
+          // Award points to post author
+          awardLikeReceived(post.userId, user.uid, post.id);
         }
       }
     }
@@ -224,6 +227,8 @@ const PostCard = ({ post, onReport, onUpdate }) => {
       // Send notification when upvoting (not removing or downvoting)
       if (direction === 'up' && newUpvoted && post.userId !== user.uid) {
         notifyUpvote(post.userId, { uid: user.uid, streetName: userProfile?.streetName, avatar: userProfile?.avatar }, post);
+        // Award points to post author
+        awardUpvoteReceived(post.userId, user.uid, post.id);
       }
     }
   };

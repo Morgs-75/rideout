@@ -60,7 +60,16 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const signUp = async (email, password, streetName, avatar = '', bio = '', bike = '') => {
+  const generateReferralCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  const signUp = async (email, password, streetName, avatar = '', bio = '', bike = '', referredByCode = '') => {
     if (DEMO_MODE) {
       setUser(DEMO_USER);
       setUserProfile({ ...DEMO_PROFILE, streetName, bio, bike });
@@ -79,6 +88,8 @@ export const AuthProvider = ({ children }) => {
       bike,
       followers: 0,
       following: 0,
+      referralCode: generateReferralCode(),
+      referredBy: referredByCode || null,
       createdAt: serverTimestamp()
     };
 

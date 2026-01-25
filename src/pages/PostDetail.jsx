@@ -6,6 +6,7 @@ import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, update
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import ShareModal from '../components/ShareModal';
+import { awardCommentGiven, awardCommentReceived, awardLikeReceived } from '../services/pointsService';
 
 const PostDetail = () => {
   const { postId } = useParams();
@@ -73,6 +74,10 @@ const PostDetail = () => {
       setLikes(l => l + 1);
       setLiked(true);
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(user.uid) });
+      // Award points to post author
+      if (post && post.userId !== user.uid) {
+        awardLikeReceived(post.userId, user.uid, postId);
+      }
     }
   };
 
@@ -98,6 +103,11 @@ const PostDetail = () => {
       await updateDoc(doc(db, 'posts', postId), { commentCount: increment(1) });
       setComments([{ id: docRef.id, ...commentData, createdAt: { toDate: () => new Date() } }, ...comments]);
       setNewComment('');
+      // Award points
+      awardCommentGiven(user.uid);
+      if (post && post.userId !== user.uid) {
+        awardCommentReceived(post.userId, user.uid, postId);
+      }
     } catch (error) {
       console.error('Error posting comment:', error);
       alert('Failed to post comment. Please try again.');

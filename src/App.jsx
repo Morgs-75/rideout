@@ -40,6 +40,7 @@ import Settings from './pages/Settings';
 import Splash from './pages/Splash';
 import RiderMap from './pages/RiderMap';
 import RideAnnouncements from './pages/RideAnnouncements';
+import Leaderboard from './pages/Leaderboard';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -122,6 +123,7 @@ function AppRoutes() {
         <Route path="/chat/:chatId" element={<Chat />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
       </Route>
       
       <Route path="*" element={<Navigate to="/" replace />} />
