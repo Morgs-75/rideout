@@ -42,6 +42,66 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   const [reshareCount, setReshareCount] = useState(post.reshares || 0);
   const [hasReshared, setHasReshared] = useState(post.resharedBy?.includes(user?.uid) || false);
   const [resharing, setResharing] = useState(false);
+  const [firstComment, setFirstComment] = useState(null);
+
+  // Fetch first comment
+  useEffect(() => {
+    const fetchFirstComment = async () => {
+      if (isDemo || !post.id) return;
+      try {
+        const commentsQuery = query(
+          collection(db, 'comments'),
+          where('postId', '==', post.id)
+        );
+        const snapshot = await getDocs(commentsQuery);
+        if (!snapshot.empty) {
+          // Sort by createdAt and get the first one
+          const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          comments.sort((a, b) => {
+            const aTime = a.createdAt?.toDate?.() || new Date(0);
+            const bTime = b.createdAt?.toDate?.() || new Date(0);
+            return aTime - bTime;
+          });
+          setFirstComment(comments[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching first comment:', error);
+      }
+    };
+    fetchFirstComment();
+  }, [post.id, isDemo]);
+
+  const handleCommentLike = async (comment) => {
+    if (!user || !comment) return;
+
+    const isLiked = comment.likedBy?.includes(user.uid);
+
+    // Optimistic update
+    setFirstComment(prev => ({
+      ...prev,
+      likes: (prev.likes || 0) + (isLiked ? -1 : 1),
+      likedBy: isLiked
+        ? (prev.likedBy || []).filter(id => id !== user.uid)
+        : [...(prev.likedBy || []), user.uid]
+    }));
+
+    try {
+      const commentRef = doc(db, 'comments', comment.id);
+      if (isLiked) {
+        await updateDoc(commentRef, {
+          likes: increment(-1),
+          likedBy: arrayRemove(user.uid)
+        });
+      } else {
+        await updateDoc(commentRef, {
+          likes: increment(1),
+          likedBy: arrayUnion(user.uid)
+        });
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+    }
+  };
 
   // Check if already following this user
   useEffect(() => {
@@ -685,6 +745,47 @@ const PostCard = ({ post, onReport, onUpdate }) => {
             </Link>
             {formatCaption(post.caption)}
           </p>
+        )}
+
+        {/* First Comment Preview */}
+        {firstComment && (
+          <div className="mt-2 flex items-center gap-2">
+            <Link to={`/profile/${firstComment.userId}`} className="w-6 h-6 rounded-full bg-dark-surface flex-shrink-0 overflow-hidden flex items-center justify-center">
+              {firstComment.userAvatar ? (
+                <img src={firstComment.userAvatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs text-neon-blue">{firstComment.streetName?.charAt(0)}</span>
+              )}
+            </Link>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-300 truncate">
+                <Link to={`/profile/${firstComment.userId}`} className="font-semibold text-white hover:underline mr-1">
+                  {firstComment.streetName}
+                </Link>
+                {firstComment.text}
+              </p>
+            </div>
+            <button
+              onClick={() => handleCommentLike(firstComment)}
+              className={`flex-shrink-0 p-1 ${
+                firstComment.likedBy?.includes(user?.uid)
+                  ? 'text-red-500'
+                  : 'text-gray-500 hover:text-red-500'
+              }`}
+            >
+              <Heart size={14} fill={firstComment.likedBy?.includes(user?.uid) ? 'currentColor' : 'none'} />
+            </button>
+          </div>
+        )}
+
+        {/* View all comments link */}
+        {(post.commentCount || 0) > 1 && (
+          <button
+            onClick={() => navigate(`/post/${post.id}`)}
+            className="text-sm text-gray-500 hover:text-gray-400 mt-1"
+          >
+            View all {post.commentCount} comments
+          </button>
         )}
       </div>
     </motion.div>
