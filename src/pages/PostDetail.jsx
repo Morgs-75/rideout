@@ -22,11 +22,53 @@ const PostDetail = () => {
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const [commentLikes, setCommentLikes] = useState({});
 
   useEffect(() => {
     fetchPost();
     fetchComments();
   }, [postId]);
+
+  const handleCommentLike = async (comment) => {
+    if (!user) return;
+
+    const commentRef = doc(db, 'comments', comment.id);
+    const isLiked = comment.likedBy?.includes(user.uid);
+
+    // Optimistic update
+    setComments(prevComments =>
+      prevComments.map(c => {
+        if (c.id === comment.id) {
+          return {
+            ...c,
+            likes: (c.likes || 0) + (isLiked ? -1 : 1),
+            likedBy: isLiked
+              ? (c.likedBy || []).filter(id => id !== user.uid)
+              : [...(c.likedBy || []), user.uid]
+          };
+        }
+        return c;
+      })
+    );
+
+    try {
+      if (isLiked) {
+        await updateDoc(commentRef, {
+          likes: increment(-1),
+          likedBy: arrayRemove(user.uid)
+        });
+      } else {
+        await updateDoc(commentRef, {
+          likes: increment(1),
+          likedBy: arrayUnion(user.uid)
+        });
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+      // Revert on error
+      fetchComments();
+    }
+  };
 
   const fetchPost = async () => {
     try {
@@ -261,7 +303,20 @@ const PostDetail = () => {
                         {comment.text}
                         {(comment.edited || comment.editedAt) && <span className="text-gray-500 text-xs ml-1">(edited)</span>}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">{timeAgo(comment.createdAt)}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-xs text-gray-500">{timeAgo(comment.createdAt)}</p>
+                        <button
+                          onClick={() => handleCommentLike(comment)}
+                          className={`flex items-center gap-1 text-xs ${
+                            comment.likedBy?.includes(user?.uid)
+                              ? 'text-red-500'
+                              : 'text-gray-500 hover:text-red-500'
+                          }`}
+                        >
+                          <Heart size={12} fill={comment.likedBy?.includes(user?.uid) ? 'currentColor' : 'none'} />
+                          {(comment.likes || 0) > 0 && <span>{comment.likes}</span>}
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>

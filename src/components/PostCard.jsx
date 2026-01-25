@@ -15,7 +15,8 @@ import {
   UserPlus,
   UserCheck,
   Send,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { doc, updateDoc, increment, arrayUnion, arrayRemove, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -379,15 +380,27 @@ const PostCard = ({ post, onReport, onUpdate }) => {
                 onClick={() => setShowMenu(false)}
               />
               <div className="absolute right-0 top-full mt-1 w-48 bg-dark-surface border border-dark-border rounded-xl overflow-hidden z-20 shadow-xl">
-                {/* Delete - only for post owner */}
+                {/* Edit & Delete - only for post owner */}
                 {post.userId === user?.uid && (
-                  <button
-                    onClick={handleDeletePost}
-                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-dark-card transition-all text-red-400"
-                  >
-                    <Trash2 size={18} />
-                    Delete Post
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate(`/edit-post/${post.id}`);
+                      }}
+                      className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-dark-card transition-all text-white"
+                    >
+                      <Pencil size={18} />
+                      Edit Post
+                    </button>
+                    <button
+                      onClick={handleDeletePost}
+                      className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-dark-card transition-all text-red-400"
+                    >
+                      <Trash2 size={18} />
+                      Delete Post
+                    </button>
+                  </>
                 )}
                 {/* Report - for others */}
                 {post.userId !== user?.uid && (

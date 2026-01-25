@@ -41,6 +41,7 @@ import Splash from './pages/Splash';
 import RiderMap from './pages/RiderMap';
 import RideAnnouncements from './pages/RideAnnouncements';
 import Leaderboard from './pages/Leaderboard';
+import EditPost from './pages/EditPost';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -117,6 +118,7 @@ function AppRoutes() {
         <Route path="/explore" element={<Explore />} />
         <Route path="/create" element={<CreatePost />} />
         <Route path="/post/:postId" element={<PostDetail />} />
+        <Route path="/edit-post/:postId" element={<EditPost />} />
         <Route path="/profile/:userId" element={<Profile />} />
         <Route path="/edit-profile" element={<EditProfile />} />
         <Route path="/messages" element={<Messages />} />
