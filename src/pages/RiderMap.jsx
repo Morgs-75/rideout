@@ -38,20 +38,83 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 };
 
-// Siren sound for police alerts
-const playSirenSound = () => {
+// Generate circle polygon for map (radiusKm in kilometers)
+const createCirclePolygon = (centerLng, centerLat, radiusKm, points = 64) => {
+  const coords = [];
+  const km = radiusKm;
+  const distanceX = km / (111.32 * Math.cos(centerLat * Math.PI / 180));
+  const distanceY = km / 110.574;
+
+  for (let i = 0; i < points; i++) {
+    const theta = (i / points) * (2 * Math.PI);
+    const x = distanceX * Math.cos(theta);
+    const y = distanceY * Math.sin(theta);
+    coords.push([centerLng + x, centerLat + y]);
+  }
+  coords.push(coords[0]); // Close the polygon
+
+  return {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [coords]
+    }
+  };
+};
+
+// Shared audio context for iOS compatibility
+let sharedAudioContext = null;
+let audioUnlocked = false;
+
+// Unlock audio on first user interaction (required for iOS)
+const unlockAudio = () => {
+  if (audioUnlocked) return;
+
   try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Create and play a silent buffer to unlock
+    const buffer = sharedAudioContext.createBuffer(1, 1, 22050);
+    const source = sharedAudioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(sharedAudioContext.destination);
+    source.start(0);
+
+    // Resume if suspended
+    if (sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume();
+    }
+
+    audioUnlocked = true;
+    console.log('Audio unlocked');
+  } catch (error) {
+    console.log('Audio unlock failed:', error);
+  }
+};
+
+// Siren sound for police alerts
+const playSirenSound = async () => {
+  try {
+    // Create context if not exists
+    if (!sharedAudioContext) {
+      sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Resume if suspended (iOS requirement)
+    if (sharedAudioContext.state === 'suspended') {
+      await sharedAudioContext.resume();
+    }
+
+    const oscillator = sharedAudioContext.createOscillator();
+    const gainNode = sharedAudioContext.createGain();
 
     oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(sharedAudioContext.destination);
 
     oscillator.type = 'sine';
     gainNode.gain.value = 0.4;
 
-    const startTime = audioContext.currentTime;
+    const startTime = sharedAudioContext.currentTime;
     const cycleLength = 1.0;
     const totalCycles = 5;
     const totalDuration = cycleLength * totalCycles;
@@ -70,7 +133,7 @@ const playSirenSound = () => {
     oscillator.start(startTime);
     oscillator.stop(startTime + totalDuration);
   } catch (error) {
-    console.log('Audio not supported:', error);
+    console.log('Audio play failed:', error);
   }
 };
 
@@ -151,6 +214,7 @@ const RiderMap = () => {
             lat: data.lastLocation.lat,
             lng: data.lastLocation.lng,
             bike: data.bike || 'Electric Rider',
+            avatar: data.avatar || null,
             online: isOnline
           };
         });
@@ -230,6 +294,21 @@ const RiderMap = () => {
     }
   }, [mapStyle, mapReady]);
 
+  // Unlock audio on any user interaction
+  useEffect(() => {
+    const handleInteraction = () => {
+      unlockAudio();
+    };
+
+    document.addEventListener('touchstart', handleInteraction, { once: true });
+    document.addEventListener('click', handleInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener('touchstart', handleInteraction);
+      document.removeEventListener('click', handleInteraction);
+    };
+  }, []);
+
   // Watch position for continuous updates
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -294,11 +373,14 @@ const RiderMap = () => {
     riders.forEach(rider => {
       const el = document.createElement('div');
       const isOnline = rider.online;
+      const avatarContent = rider.avatar
+        ? `<img src="${rider.avatar}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />`
+        : `<span style="font-size: 20px;">⚡🏍️</span>`;
       el.innerHTML = `
         <div style="position: relative; cursor: pointer;">
           <div style="width: 50px; height: 50px; background: ${isOnline ? 'linear-gradient(135deg, #00D4FF, #39FF14)' : '#666'}; border-radius: 50%; padding: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-            <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">
-              🏍️
+            <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              ${avatarContent}
             </div>
           </div>
           <div style="position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); background: ${isOnline ? '#00D4FF' : '#666'}; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis;">
@@ -327,7 +409,7 @@ const RiderMap = () => {
   useEffect(() => {
     if (!map.current || !mapReady) return;
 
-    // Remove old alert markers
+    // Remove old alert markers and circle layers
     Object.keys(markersRef.current).forEach(key => {
       if (key.startsWith('alert-')) {
         markersRef.current[key].remove();
@@ -335,9 +417,64 @@ const RiderMap = () => {
       }
     });
 
+    // Remove old police radius circles
+    alerts.forEach(alert => {
+      const sourceId = `police-radius-${alert.id}`;
+      const layerId = `police-radius-fill-${alert.id}`;
+      const outlineId = `police-radius-outline-${alert.id}`;
+
+      if (map.current.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+      if (map.current.getLayer(outlineId)) {
+        map.current.removeLayer(outlineId);
+      }
+      if (map.current.getSource(sourceId)) {
+        map.current.removeSource(sourceId);
+      }
+    });
+
     // Add new alert markers
     alerts.forEach(alert => {
       const alertType = ALERT_TYPES[alert.type];
+
+      // Add 3km radius circle for police alerts
+      if (alert.type === 'police') {
+        const sourceId = `police-radius-${alert.id}`;
+        const circleGeoJSON = createCirclePolygon(alert.lng, alert.lat, 3);
+
+        // Add source if it doesn't exist
+        if (!map.current.getSource(sourceId)) {
+          map.current.addSource(sourceId, {
+            type: 'geojson',
+            data: circleGeoJSON
+          });
+
+          // Add fill layer (light blue with transparency)
+          map.current.addLayer({
+            id: `police-radius-fill-${alert.id}`,
+            type: 'fill',
+            source: sourceId,
+            paint: {
+              'fill-color': '#00D4FF',
+              'fill-opacity': 0.15
+            }
+          });
+
+          // Add outline layer
+          map.current.addLayer({
+            id: `police-radius-outline-${alert.id}`,
+            type: 'line',
+            source: sourceId,
+            paint: {
+              'line-color': '#00D4FF',
+              'line-width': 2,
+              'line-opacity': 0.5
+            }
+          });
+        }
+      }
+
       const el = document.createElement('div');
       el.innerHTML = `
         <div style="width: 40px; height: 40px; background: ${alertType.color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 15px ${alertType.color}; cursor: pointer;">
@@ -358,6 +495,25 @@ const RiderMap = () => {
         .setPopup(popup)
         .addTo(map.current);
     });
+
+    // Cleanup function to remove circles when alerts change
+    return () => {
+      alerts.forEach(alert => {
+        if (alert.type === 'police' && map.current) {
+          const sourceId = `police-radius-${alert.id}`;
+          const layerId = `police-radius-fill-${alert.id}`;
+          const outlineId = `police-radius-outline-${alert.id}`;
+
+          try {
+            if (map.current.getLayer(layerId)) map.current.removeLayer(layerId);
+            if (map.current.getLayer(outlineId)) map.current.removeLayer(outlineId);
+            if (map.current.getSource(sourceId)) map.current.removeSource(sourceId);
+          } catch (e) {
+            // Ignore errors during cleanup
+          }
+        }
+      });
+    };
   }, [alerts, mapReady]);
 
   // Subscribe to alerts from Firebase
@@ -415,6 +571,9 @@ const RiderMap = () => {
   }, [alerts, userLocation]);
 
   const createAlert = async (type) => {
+    // Unlock audio on user interaction
+    unlockAudio();
+
     if (!userLocation) {
       setNotificationMessage('Enable location to report');
       setShowNotification(true);
