@@ -16,7 +16,8 @@ import {
   UserCheck,
   Send,
   Trash2,
-  Pencil
+  Pencil,
+  Repeat2
 } from 'lucide-react';
 import { doc, updateDoc, increment, arrayUnion, arrayRemove, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -38,6 +39,9 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [reshareCount, setReshareCount] = useState(post.reshares || 0);
+  const [hasReshared, setHasReshared] = useState(post.resharedBy?.includes(user?.uid) || false);
+  const [resharing, setResharing] = useState(false);
 
   // Check if already following this user
   useEffect(() => {
@@ -94,6 +98,65 @@ const PostCard = ({ post, onReport, onUpdate }) => {
       console.error('Error toggling follow:', error);
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  const handleReshare = async () => {
+    if (!user || resharing || post.userId === user.uid) return;
+
+    // Don't allow resharing your own posts or already reshared
+    if (hasReshared) {
+      alert('You have already reshared this post');
+      return;
+    }
+
+    setResharing(true);
+
+    try {
+      // Create a reshare post
+      const reshareData = {
+        userId: user.uid,
+        streetName: userProfile?.streetName || 'Unknown',
+        userAvatar: userProfile?.avatar || '',
+        mediaType: post.mediaType,
+        mediaUrl: post.mediaUrl,
+        caption: post.caption || '',
+        hashtags: post.hashtags || [],
+        likes: 0,
+        likedBy: [],
+        upvotes: 0,
+        downvotes: 0,
+        upvotedBy: [],
+        downvotedBy: [],
+        commentCount: 0,
+        reshares: 0,
+        resharedBy: [],
+        // Mark as reshare with original post info
+        isReshare: true,
+        originalPostId: post.originalPostId || post.id,
+        originalUserId: post.originalUserId || post.userId,
+        originalStreetName: post.originalStreetName || post.streetName,
+        originalUserAvatar: post.originalUserAvatar || post.userAvatar,
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'posts'), reshareData);
+
+      // Update original post reshare count
+      const originalPostRef = doc(db, 'posts', post.originalPostId || post.id);
+      await updateDoc(originalPostRef, {
+        reshares: increment(1),
+        resharedBy: arrayUnion(user.uid)
+      });
+
+      setReshareCount(prev => prev + 1);
+      setHasReshared(true);
+      alert('Post reshared to your feed!');
+    } catch (error) {
+      console.error('Error resharing post:', error);
+      alert('Failed to reshare post');
+    } finally {
+      setResharing(false);
     }
   };
 
@@ -306,6 +369,17 @@ const PostCard = ({ post, onReport, onUpdate }) => {
       animate={{ opacity: 1, y: 0 }}
       className="bg-dark-card border border-dark-border rounded-2xl overflow-hidden"
     >
+      {/* Reshare indicator */}
+      {post.isReshare && (
+        <div className="px-4 pt-3 pb-1 flex items-center gap-2 text-gray-500 text-sm">
+          <Repeat2 size={14} />
+          <span>{post.streetName} reshared</span>
+          <Link to={`/profile/${post.originalUserId}`} className="text-neon-blue hover:underline">
+            @{post.originalStreetName}
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
@@ -486,6 +560,22 @@ const PostCard = ({ post, onReport, onUpdate }) => {
             >
               <MessageCircle size={24} />
               <span className="text-sm font-medium">{post.commentCount || 0}</span>
+            </button>
+
+            {/* Reshare */}
+            <button
+              onClick={handleReshare}
+              disabled={resharing || hasReshared || post.userId === user?.uid}
+              className={`flex items-center gap-1.5 transition-all ${
+                post.userId === user?.uid
+                  ? 'text-gray-600 cursor-not-allowed'
+                  : hasReshared
+                    ? 'text-neon-green'
+                    : 'text-gray-400 hover:text-neon-green'
+              }`}
+            >
+              <Repeat2 size={22} />
+              {reshareCount > 0 && <span className="text-sm font-medium">{reshareCount}</span>}
             </button>
 
             {/* Share */}
