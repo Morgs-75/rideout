@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PenSquare, Search, Users } from 'lucide-react';
-import { collection, query, where, orderBy, getDocs, or } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,21 +13,33 @@ const Messages = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) fetchConversations();
-  }, [user]);
+    if (!user) return;
 
-  const fetchConversations = async () => {
     setLoading(true);
-    try {
-      const convQuery = query(collection(db, 'conversations'), where('participants', 'array-contains', user.uid), orderBy('lastMessageAt', 'desc'));
-      const snapshot = await getDocs(convQuery);
-      setConversations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
+
+    // Use real-time subscription for conversations
+    const convQuery = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(convQuery, (snapshot) => {
+      const convs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort by lastMessageAt on client side to avoid composite index requirement
+      convs.sort((a, b) => {
+        const aTime = a.lastMessageAt?.toDate?.()?.getTime() || 0;
+        const bTime = b.lastMessageAt?.toDate?.()?.getTime() || 0;
+        return bTime - aTime;
+      });
+      setConversations(convs);
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      console.error('Error fetching conversations:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const timeAgo = (timestamp) => {
     if (!timestamp) return '';

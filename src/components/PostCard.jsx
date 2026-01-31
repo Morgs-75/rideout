@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -17,7 +17,10 @@ import {
   Send,
   Trash2,
   Pencil,
-  Repeat2
+  Repeat2,
+  Music,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { doc, updateDoc, increment, arrayUnion, arrayRemove, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -26,9 +29,37 @@ import { demoPosts } from '../utils/demoStore';
 import { notifyLike, notifyUpvote, notifyFollow } from '../utils/notifications';
 import { awardLikeReceived, awardUpvoteReceived, awardCommentGiven } from '../services/pointsService';
 
+// Generate circle GeoJSON for Mapbox static API (1.5km radius for alerts)
+const generateCircleGeoJSON = (lng, lat, radiusKm = 1.5, points = 24) => {
+  const coords = [];
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    // Convert km to degrees (approximate)
+    const dLat = (radiusKm / 111) * Math.cos(angle);
+    const dLng = (radiusKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(angle);
+    coords.push([lng + dLng, lat + dLat]);
+  }
+  const geojson = {
+    type: "Feature",
+    properties: {
+      stroke: "#ff3b30",
+      "stroke-width": 2,
+      "stroke-opacity": 0.8,
+      fill: "#ff3b30",
+      "fill-opacity": 0.15
+    },
+    geometry: {
+      type: "Polygon",
+      coordinates: [coords]
+    }
+  };
+  return encodeURIComponent(JSON.stringify(geojson));
+};
+
 const PostCard = ({ post, onReport, onUpdate }) => {
   const { user, userProfile, isDemo } = useAuth();
   const navigate = useNavigate();
+  const audioRef = useRef(null);
   const [liked, setLiked] = useState(post.likedBy?.includes(user?.uid) || false);
   const [likes, setLikes] = useState(post.likes || 0);
   const [upvoted, setUpvoted] = useState(post.upvotedBy?.includes(user?.uid) || false);
@@ -36,6 +67,7 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   const [voteScore, setVoteScore] = useState((post.upvotes || 0) - (post.downvotes || 0));
   const [showMenu, setShowMenu] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -43,6 +75,33 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   const [hasReshared, setHasReshared] = useState(post.resharedBy?.includes(user?.uid) || false);
   const [resharing, setResharing] = useState(false);
   const [firstComment, setFirstComment] = useState(null);
+
+  // Handle music playback
+  const toggleMusic = () => {
+    if (!post.music?.url) return;
+
+    if (isMusicPlaying) {
+      audioRef.current?.pause();
+      setIsMusicPlaying(false);
+    } else {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(post.music.url);
+        audioRef.current.loop = true;
+      }
+      audioRef.current.play();
+      setIsMusicPlaying(true);
+    }
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // Fetch first comment
   useEffect(() => {
@@ -178,8 +237,8 @@ const PostCard = ({ post, onReport, onUpdate }) => {
         userId: user.uid,
         streetName: userProfile?.streetName || 'Unknown',
         userAvatar: userProfile?.avatar || '',
-        mediaType: post.mediaType,
-        mediaUrl: post.mediaUrl,
+        mediaType: post.mediaType || 'none',
+        mediaUrl: post.mediaUrl || '',
         caption: post.caption || '',
         hashtags: post.hashtags || [],
         likes: 0,
@@ -200,6 +259,11 @@ const PostCard = ({ post, onReport, onUpdate }) => {
         createdAt: serverTimestamp()
       };
 
+      // Include location if original had it (for alert posts with maps)
+      if (post.location) {
+        reshareData.location = post.location;
+      }
+
       await addDoc(collection(db, 'posts'), reshareData);
 
       // Update original post reshare count
@@ -211,7 +275,7 @@ const PostCard = ({ post, onReport, onUpdate }) => {
 
       setReshareCount(prev => prev + 1);
       setHasReshared(true);
-      alert('Post reshared to your feed!');
+      alert('Post reshared!');
     } catch (error) {
       console.error('Error resharing post:', error);
       alert('Failed to reshare post');
@@ -561,42 +625,123 @@ const PostCard = ({ post, onReport, onUpdate }) => {
         </div>
       </div>
 
-      {/* Media */}
-      <div
-        className="relative aspect-square bg-dark-bg cursor-pointer"
-        onClick={() => navigate(`/post/${post.id}`)}
-      >
-        {post.mediaType === 'video' ? (
-          <video
-            src={post.mediaUrl}
-            className="w-full h-full object-cover"
-            loop
-            muted
-            playsInline
-            onMouseEnter={(e) => {
-              e.target.play();
-              setIsPlaying(true);
-            }}
-            onMouseLeave={(e) => {
-              e.target.pause();
-              setIsPlaying(false);
-            }}
-          />
-        ) : (
-          <img
-            src={post.mediaUrl}
-            alt=""
-            className="w-full h-full object-cover"
-          />
-        )}
-        {post.mediaType === 'video' && !isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-dark-bg/60 flex items-center justify-center backdrop-blur-sm">
-              <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+      {/* Media - show image/video if available, or map if location exists */}
+      {post.mediaUrl && post.mediaType !== 'none' ? (
+        <div
+          className="relative aspect-square bg-dark-bg cursor-pointer"
+          onClick={() => navigate(`/post/${post.id}`)}
+        >
+          {post.mediaType === 'video' ? (
+            <>
+              <video
+                src={post.mediaUrl}
+                className="w-full h-full object-cover"
+                loop
+                muted
+                playsInline
+                autoPlay
+                preload="auto"
+                onCanPlay={(e) => {
+                  // Pause immediately after it can play to show first frame
+                  if (!isPlaying) {
+                    e.target.pause();
+                    e.target.currentTime = 0.1;
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  e.target.play();
+                  setIsPlaying(true);
+                }}
+                onMouseLeave={(e) => {
+                  e.target.pause();
+                  e.target.currentTime = 0.1;
+                  setIsPlaying(false);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isPlaying) {
+                    e.target.pause();
+                    setIsPlaying(false);
+                  } else {
+                    e.target.play();
+                    setIsPlaying(true);
+                  }
+                }}
+              />
+              {/* Render overlay elements for videos */}
+              {post.overlayElements?.map(el => (
+                <div
+                  key={el.id}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${el.x}%`,
+                    top: `${el.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: `${el.size}px`,
+                    color: el.color,
+                    textShadow: el.type === 'text' ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                  }}
+                >
+                  <span className={el.font || ''}>{el.content}</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <img
+              src={post.mediaUrl}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          )}
+          {post.mediaType === 'video' && !isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-dark-bg/60 flex items-center justify-center backdrop-blur-sm">
+                <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+              </div>
             </div>
+          )}
+          {/* Music indicator */}
+          {post.music?.url && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMusic(); }}
+              className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 backdrop-blur rounded-full flex items-center gap-2 text-white text-sm"
+            >
+              <span>{post.music.icon}</span>
+              <span className="max-w-20 truncate">{post.music.name}</span>
+              {isMusicPlaying ? <Volume2 size={14} className="text-neon-blue" /> : <VolumeX size={14} />}
+            </button>
+          )}
+        </div>
+      ) : post.location?.lat && post.location?.lng ? (
+        <div
+          className="relative aspect-square bg-dark-bg cursor-pointer"
+          onClick={() => navigate(`/post/${post.id}`)}
+        >
+          <img
+            src={`https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/geojson(${generateCircleGeoJSON(post.location.lng, post.location.lat)}),pin-s+ff3b30(${post.location.lng},${post.location.lat})/${post.location.lng},${post.location.lat},12,0/600x600@2x?access_token=pk.eyJ1IjoidHJveW03IiwiYSI6ImNta3M3bGw1azFiamEza3BweDJpMGswa3kifQ.P8EVLVOr4ChTrpkyCIg36A`}
+            alt="Location"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-2 left-2 px-2 py-1 bg-dark-bg/80 backdrop-blur rounded-lg text-xs text-gray-300 flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            Alert Location (1.5km radius)
           </div>
-        )}
-      </div>
+        </div>
+      ) : post.isTextOnly && post.caption ? (
+        <div
+          className="relative aspect-square bg-gradient-to-br from-dark-surface via-dark-bg to-dark-card flex items-center justify-center p-8 cursor-pointer"
+          onClick={() => navigate(`/post/${post.id}`)}
+        >
+          <p className="text-white text-xl md:text-2xl text-center font-medium leading-relaxed max-h-full overflow-hidden">
+            {post.caption.length > 280 ? post.caption.slice(0, 280) + '...' : post.caption}
+          </p>
+          {/* Decorative gradient border */}
+          <div className="absolute inset-0 pointer-events-none border-2 border-neon-blue/20 rounded-none" />
+        </div>
+      ) : null}
 
       {/* Actions */}
       <div className="p-4">

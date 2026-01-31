@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Camera, Loader2, Image, Fingerprint, Shield } from 'lucide-react';
+import { ArrowLeft, Camera, Loader2, Image, Fingerprint, Shield, Phone } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ const EditProfile = () => {
   const [avatarPreview, setAvatarPreview] = useState(userProfile?.avatar || '');
   const [bio, setBio] = useState(userProfile?.bio || '');
   const [bike, setBike] = useState(userProfile?.bike || '');
+  const [phone, setPhone] = useState(userProfile?.phone || '');
   const [loading, setLoading] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -105,7 +106,7 @@ const EditProfile = () => {
         avatarUrl = await getDownloadURL(avatarRef);
       }
 
-      await updateProfile({ avatar: avatarUrl, bio: bio.trim(), bike: bike.trim() });
+      await updateProfile({ avatar: avatarUrl, bio: bio.trim(), bike: bike.trim(), phone: phone.trim() });
       navigate(`/profile/${user.uid}`);
     } catch (error) {
       console.error('Error:', error);
@@ -173,9 +174,21 @@ const EditProfile = () => {
         </div>
 
         {/* Bike */}
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-sm font-medium text-gray-400 mb-2">Your Ride</label>
           <input type="text" value={bike} onChange={(e) => setBike(e.target.value)} placeholder="e.g. Sur-Ron X 2024" className="w-full px-4 py-3 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-blue transition-all" />
+        </div>
+
+        {/* Phone */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-400 mb-2">
+            <span className="flex items-center gap-2">
+              <Phone size={16} />
+              Mobile Number
+            </span>
+          </label>
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +44 7700 900000" className="w-full px-4 py-3 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-blue transition-all" />
+          <p className="text-xs text-gray-500 mt-1">For SMS alerts about rides and emergencies</p>
         </div>
 
         {/* Security Section */}

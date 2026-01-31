@@ -8,7 +8,8 @@ export const NOTIFICATION_TYPES = {
   COMMENT: 'comment',
   FOLLOW: 'follow',
   FRIEND_POST: 'friend_post',
-  PATROL_ALERT: 'patrol_alert'
+  PATROL_ALERT: 'patrol_alert',
+  LIVERIDE_INVITE: 'liveride_invite'
 };
 
 /**
@@ -100,4 +101,28 @@ export const notifyPatrolAlert = async (userId, alertType, reporterName, distanc
     distance,
     message: `${alertType} reported ${distance}km away by ${reporterName}`
   });
+};
+
+/**
+ * Create a LiveRide invite notification
+ * Sent to users who are added as viewers to someone's LiveRide
+ */
+export const notifyLiveRideInvite = async (viewerId, fromUser, rideId) => {
+  await createNotification(viewerId, NOTIFICATION_TYPES.LIVERIDE_INVITE, {
+    fromUserId: fromUser.uid,
+    fromUserName: fromUser.streetName,
+    fromUserAvatar: fromUser.avatar || '',
+    rideId,
+    message: `${fromUser.streetName} is sharing their LiveRide with you`
+  });
+};
+
+/**
+ * Notify multiple viewers about a LiveRide
+ */
+export const notifyLiveRideViewers = async (viewerIds, fromUser, rideId) => {
+  const promises = viewerIds.map(viewerId =>
+    notifyLiveRideInvite(viewerId, fromUser, rideId)
+  );
+  await Promise.all(promises);
 };

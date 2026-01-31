@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Bike, FileText, ChevronRight, ChevronLeft, Check, Upload } from 'lucide-react';
+import { Camera, Bike, FileText, ChevronRight, ChevronLeft, Check, Upload, Phone } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ const Onboarding = () => {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [bio, setBio] = useState('');
   const [bike, setBike] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
   const { user, updateProfile } = useAuth();
@@ -44,7 +45,8 @@ const Onboarding = () => {
       await updateProfile({
         avatar: avatarUrl,
         bio: bio.trim(),
-        bike: bike.trim()
+        bike: bike.trim(),
+        phone: phone.trim()
       });
 
       navigate('/feed');
@@ -70,6 +72,11 @@ const Onboarding = () => {
       title: 'Your Ride',
       subtitle: "What's your electric beast?",
       icon: Bike
+    },
+    {
+      title: 'Your Mobile',
+      subtitle: 'For ride alerts and notifications',
+      icon: Phone
     }
   ];
 
@@ -184,6 +191,19 @@ const Onboarding = () => {
                   <p className="mt-2 text-xs text-gray-500">Tell us about your electric ride</p>
                 </div>
               )}
+
+              {step === 4 && (
+                <div>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. +44 7700 900000"
+                    className="w-full p-4 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all"
+                  />
+                  <p className="mt-2 text-xs text-gray-500">We'll send you SMS alerts for rides and emergencies</p>
+                </div>
+              )}
             </div>
           </motion.div>
         </AnimatePresence>
@@ -203,7 +223,7 @@ const Onboarding = () => {
           )}
           <button
             onClick={() => {
-              if (step < 3) {
+              if (step < 4) {
                 setStep(step + 1);
               } else {
                 handleFinish();
@@ -217,7 +237,7 @@ const Onboarding = () => {
                 <div className="w-5 h-5 border-2 border-dark-bg border-t-transparent rounded-full animate-spin"></div>
                 Saving...
               </>
-            ) : step < 3 ? (
+            ) : step < 4 ? (
               <>
                 Next
                 <ChevronRight size={20} />

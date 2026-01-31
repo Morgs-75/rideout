@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
-import { Home, Map, PlusSquare, MessageCircle, User, Search, X, UserPlus, UserCheck } from 'lucide-react';
+import { Home, Map, PlusSquare, MessageCircle, User, Search, X, UserPlus, UserCheck, Star } from 'lucide-react';
 import { collection, query, getDocs, where, addDoc, deleteDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -125,9 +125,9 @@ const Layout = () => {
 
   const navItems = [
     { to: '/feed', icon: Home, label: 'Feed' },
-    { to: '/map', icon: Map, label: 'Maps' },
+    { to: '/map', icon: Map, label: 'Map' },
     { to: '/create', icon: PlusSquare, label: 'Create' },
-    { to: '/messages', icon: MessageCircle, label: 'Messages' },
+    { to: '/messages', icon: MessageCircle, label: 'Chat' },
     { to: `/profile/${user?.uid}`, icon: User, label: 'Profile' },
   ];
 
@@ -182,15 +182,15 @@ const Layout = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100]"
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] overflow-hidden"
         >
-          <div className="h-full flex flex-col max-w-lg mx-auto">
-            <div className="p-4 border-b border-dark-border flex items-center gap-3">
+          <div className="h-full max-h-full flex flex-col max-w-lg mx-auto overflow-hidden">
+            <div className="p-4 pt-14 border-b border-dark-border flex items-center gap-3">
               <button
                 onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-                className="p-2 -ml-2 text-gray-400 hover:text-white"
+                className="w-12 h-12 rounded-full bg-dark-card flex items-center justify-center text-white active:bg-dark-border"
               >
-                <X size={24} />
+                <X size={28} />
               </button>
               <input
                 type="text"
@@ -202,7 +202,7 @@ const Layout = () => {
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {allUsers.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Search size={32} className="mx-auto mb-2 opacity-50" />

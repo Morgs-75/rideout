@@ -178,7 +178,7 @@ const Settings = () => {
                 <Volume2 size={20} className="text-gray-400" />
                 <div>
                   <span>Alert Sounds</span>
-                  <p className="text-xs text-gray-500">Siren for police alerts</p>
+                  <p className="text-xs text-gray-500">Siren for alerts</p>
                 </div>
               </div>
               <ToggleSwitch enabled={soundEnabled} onToggle={toggleSound} />

@@ -19,6 +19,12 @@
       // Register service worker for auto-updates
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          // Force check for updates on every page load
+          reg.update();
+
+          // Check for updates every 30 seconds
+          setInterval(function() { reg.update(); }, 30000);
+
           reg.addEventListener('updatefound', function() {
             var newWorker = reg.installing;
             newWorker.addEventListener('statechange', function() {
@@ -27,6 +33,11 @@
               }
             });
           });
+        });
+
+        // Also listen for controller change (new SW took over)
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          window.location.reload();
         });
       }
     </script>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080, height=1920">
+  <title>RideOut Promo - Intro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1080px;
+      height: 1920px;
+      background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+    .glow-blue {
+      position: absolute;
+      top: 20%;
+      left: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0,212,255,0.3) 0%, transparent 70%);
+      filter: blur(60px);
+    }
+    .glow-green {
+      position: absolute;
+      bottom: 20%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(57,255,20,0.3) 0%, transparent 70%);
+      filter: blur(60px);
+    }
+    .content {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+    }
+    .pov {
+      color: #888;
+      font-size: 48px;
+      letter-spacing: 8px;
+      margin-bottom: 40px;
+    }
+    .main-text {
+      font-size: 72px;
+      font-weight: 900;
+      color: white;
+      line-height: 1.2;
+      text-transform: uppercase;
+      max-width: 900px;
+    }
+    .highlight {
+      background: linear-gradient(90deg, #00D4FF, #39FF14);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .emoji {
+      font-size: 120px;
+      margin-top: 60px;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-blue"></div>
+  <div class="glow-green"></div>
+  <div class="content">
+    <div class="pov">POV</div>
+    <div class="main-text">
+      YOU FINALLY FOUND<br>
+      <span class="highlight">THE APP</span><br>
+      FOR RIDERS
+    </div>
+    <div class="emoji">🏍️⚡</div>
+  </div>
+</body>
+</html>

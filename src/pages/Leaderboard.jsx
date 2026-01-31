@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Trophy, Crown, Users, Route, ChevronRight, Flame } from 'lucide-react';
+import { Trophy, Crown, Users, Route, ChevronRight, Flame, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getLeaderboard, getUserPoints, initUserPoints } from '../services/pointsService';
 import { GAMIFICATION_CONFIG, getTier, formatPoints } from '../config/gamification';
 
 const Leaderboard = () => {
   const { user, userProfile } = useAuth();
+  const navigate = useNavigate();
   const [activeBoard, setActiveBoard] = useState('road_legends');
   const [leaderboard, setLeaderboard] = useState([]);
   const [userRank, setUserRank] = useState(null);
@@ -84,7 +85,15 @@ const Leaderboard = () => {
     <div className="min-h-screen bg-dark-bg pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-dark-bg/95 backdrop-blur-lg border-b border-dark-border safe-top">
-        <div className="max-w-lg mx-auto px-4 py-3">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <Link
+            to="/feed"
+            className="flex items-center gap-1 px-3 py-2 -ml-2 rounded-full bg-dark-card text-white"
+            style={{ minHeight: '48px', WebkitTapHighlightColor: 'rgba(0,212,255,0.3)' }}
+          >
+            <ArrowLeft size={20} />
+            <span className="text-sm font-medium">Back</span>
+          </Link>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Trophy className="text-yellow-400" size={24} />
             Leaderboards

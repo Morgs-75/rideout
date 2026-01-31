@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, UserPlus, ChevronUp, Bell } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, ChevronUp, Bell, Radio } from 'lucide-react';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +28,7 @@ const Notifications = () => {
       case 'follow': return <UserPlus size={20} className="text-neon-blue" />;
       case 'comment': return <MessageCircle size={20} className="text-neon-green" />;
       case 'upvote': return <ChevronUp size={20} className="text-neon-green" />;
+      case 'liveride_invite': return <Radio size={20} className="text-hot-orange" />;
       default: return <Bell size={20} className="text-gray-500" />;
     }
   };
@@ -38,6 +39,7 @@ const Notifications = () => {
       case 'follow': return 'started following you';
       case 'comment': return `commented: "${notif.text}"`;
       case 'upvote': return 'upvoted your post';
+      case 'liveride_invite': return 'is sharing their LiveRide with you';
       default: return 'interacted with you';
     }
   };

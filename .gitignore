@@ -42,3 +42,10 @@ dist-ssr
 *.png
 *.jpg
 *.jpeg
+
+# Capacitor / iOS
+ios/App/App/public
+ios/App/Pods
+ios/App/*.xcworkspace/xcuserdata
+ios/App/*.xcodeproj/xcuserdata
+*.xcuserstate

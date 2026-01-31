@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Image, Video, X, MapPin, Hash, Loader2, Share2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Image, Video, X, MapPin, Hash, Loader2, Share2, Pencil, Music } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { storage, db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { demoPosts } from '../utils/demoStore';
 import LocationPicker from '../components/LocationPicker';
+import MediaEditor from '../components/MediaEditor';
 import { awardPostCreated } from '../services/pointsService';
 
 const CreatePost = () => {
@@ -26,6 +27,10 @@ const CreatePost = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [videoDuration, setVideoDuration] = useState(0);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editedMedia, setEditedMedia] = useState(null); // Blob from editor
+  const [overlayElements, setOverlayElements] = useState([]); // For video overlays
+  const [musicData, setMusicData] = useState(null); // Music track info
 
   const handleMediaSelect = (e) => {
     const file = e.target.files[0];
@@ -68,6 +73,25 @@ const CreatePost = () => {
     setMediaPreview(null);
     setMediaType(null);
     setVideoDuration(0);
+    setEditedMedia(null);
+    setOverlayElements([]);
+    setMusicData(null);
+  };
+
+  const handleEditorSave = (result) => {
+    if (result.type === 'image' && result.blob) {
+      // For images, use the rendered blob
+      setEditedMedia(result.blob);
+      setMediaPreview(URL.createObjectURL(result.blob));
+    } else if (result.type === 'overlay') {
+      // For videos, store overlay elements
+      setOverlayElements(result.elements);
+    }
+    // Store music data if present
+    if (result.music) {
+      setMusicData(result.music);
+    }
+    setShowEditor(false);
   };
 
   const extractHashtags = (text) => {
@@ -77,8 +101,9 @@ const CreatePost = () => {
   };
 
   const handlePost = async () => {
-    if (!media) {
-      setError('Please select a photo or video');
+    // Allow text-only posts OR media posts
+    if (!media && !caption.trim()) {
+      setError('Please add text or select a photo/video');
       return;
     }
 
@@ -91,8 +116,11 @@ const CreatePost = () => {
       // In demo mode, use the local preview URL
       // In production, upload to Firebase
       if (!isDemo) {
-        const mediaRef = ref(storage, `posts/${user.uid}/${Date.now()}_${media.name}`);
-        await uploadBytes(mediaRef, media);
+        // Use edited media if available (for images with overlays)
+        const mediaToUpload = editedMedia || media;
+        const fileName = editedMedia ? `${Date.now()}_edited.jpg` : `${Date.now()}_${media.name}`;
+        const mediaRef = ref(storage, `posts/${user.uid}/${fileName}`);
+        await uploadBytes(mediaRef, mediaToUpload);
         mediaUrl = await getDownloadURL(mediaRef);
       }
 
@@ -100,8 +128,8 @@ const CreatePost = () => {
         userId: user.uid,
         streetName: userProfile?.streetName || 'Unknown',
         userAvatar: userProfile?.avatar || '',
-        mediaType,
-        mediaUrl,
+        mediaType: media ? mediaType : 'none',
+        mediaUrl: media ? mediaUrl : '',
         caption: caption.trim(),
         hashtags: extractHashtags(caption),
         likes: 0,
@@ -111,7 +139,12 @@ const CreatePost = () => {
         upvotedBy: [],
         downvotedBy: [],
         commentCount: 0,
-        ...(location && { location: { name: location.name, lat: location.lat, lng: location.lng } })
+        isTextOnly: !media,
+        ...(location && { location: { name: location.name, lat: location.lat, lng: location.lng } }),
+        // Include overlay elements for videos
+        ...(overlayElements.length > 0 && { overlayElements }),
+        // Include music data
+        ...(musicData && { music: musicData })
       };
 
       if (isDemo) {
@@ -172,15 +205,48 @@ const CreatePost = () => {
         ) : (
           <div className="relative aspect-square bg-dark-card rounded-2xl overflow-hidden">
             {mediaType === 'video' ? (
-              <video src={mediaPreview} className="w-full h-full object-cover" controls loop muted playsInline />
+              <div className="relative w-full h-full">
+                <video src={mediaPreview} className="w-full h-full object-cover" controls loop muted playsInline />
+                {/* Render overlay elements for video */}
+                {overlayElements.map(el => (
+                  <div
+                    key={el.id}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${el.x}%`,
+                      top: `${el.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      fontSize: `${el.size}px`,
+                      color: el.color,
+                      textShadow: el.type === 'text' ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                    }}
+                  >
+                    <span className={el.font || ''}>{el.content}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
             )}
             <button onClick={removeMedia} className="absolute top-3 right-3 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center text-white">
               <X size={18} />
             </button>
+            <button
+              onClick={() => setShowEditor(true)}
+              className="absolute top-3 left-3 px-3 py-1.5 bg-black/60 rounded-full flex items-center gap-1.5 text-white text-sm"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
             {mediaType === 'video' && (
               <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/60 rounded-lg text-xs text-white">{videoDuration.toFixed(1)}s</div>
+            )}
+            {/* Music indicator */}
+            {musicData && (
+              <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/60 rounded-full flex items-center gap-2 text-white text-sm">
+                <span>{musicData.icon}</span>
+                <span className="max-w-24 truncate">{musicData.name}</span>
+              </div>
             )}
           </div>
         )}
@@ -242,9 +308,9 @@ const CreatePost = () => {
         {/* Post Button */}
         <button
           onClick={handlePost}
-          disabled={!media || loading}
+          disabled={(!media && !caption.trim()) || loading}
           className={`w-full mt-6 py-4 rounded-xl font-bold text-lg transition-all touch-manipulation ${
-            media && !loading
+            (media || caption.trim()) && !loading
               ? 'bg-gradient-to-r from-neon-blue to-neon-green text-dark-bg'
               : 'bg-dark-card text-gray-500'
           }`}
@@ -265,6 +331,18 @@ const CreatePost = () => {
           onClose={() => setShowLocationPicker(false)}
         />
       )}
+
+      {/* Media Editor */}
+      <AnimatePresence>
+        {showEditor && mediaPreview && (
+          <MediaEditor
+            mediaUrl={editedMedia ? URL.createObjectURL(editedMedia) : mediaPreview}
+            mediaType={mediaType}
+            onSave={handleEditorSave}
+            onCancel={() => setShowEditor(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

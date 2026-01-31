@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Bell, RefreshCw, Calendar, ChevronRight, UserPlus, Send, Search, X, UserCheck, Trophy } from 'lucide-react';
+import { Zap, Bell, RefreshCw, Calendar, ChevronRight, UserPlus, Send, Search, X, UserCheck, Trophy, Smartphone, Star } from 'lucide-react';
 import {
   collection,
   query,
@@ -38,6 +38,17 @@ const Feed = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState([]);
   const [followingIds, setFollowingIds] = useState([]);
+  const [showInstallBanner, setShowInstallBanner] = useState(() => {
+    // Only show if not dismissed and not already in standalone mode (installed)
+    const dismissed = localStorage.getItem('installBannerDismissed');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    return !dismissed && !isStandalone;
+  });
+
+  const dismissInstallBanner = () => {
+    localStorage.setItem('installBannerDismissed', 'true');
+    setShowInstallBanner(false);
+  };
 
   const fetchFollowing = useCallback(async () => {
     if (!user) return [];
@@ -82,7 +93,8 @@ const Feed = () => {
       return getDocs(postsQuery);
     }
 
-    const userIds = [...followingIds, user.uid];
+    // User's own ID first to ensure their posts always show (slice takes first 10)
+    const userIds = [user.uid, ...followingIds];
 
     const postsQuery = lastDocument
       ? query(
@@ -264,6 +276,13 @@ const Feed = () => {
               <Search size={24} />
             </button>
             <Link
+              to="/rate-my-ride"
+              className="p-2 text-hot-orange rounded-full hover:bg-dark-card transition-all"
+              title="Rate My Ride"
+            >
+              <Star size={22} />
+            </Link>
+            <Link
               to="/leaderboard"
               className="p-2 text-yellow-500 rounded-full hover:bg-dark-card transition-all"
             >
@@ -301,6 +320,34 @@ const Feed = () => {
       {isDemo && (
         <div className="bg-neon-blue/20 border-b border-neon-blue/30 px-4 py-2">
           <p className="text-center text-sm text-neon-blue">Demo Mode - Posts are stored locally</p>
+        </div>
+      )}
+
+      {/* Add to Home Screen Banner */}
+      {showInstallBanner && (
+        <div className="bg-gradient-to-r from-neon-green/20 to-neon-blue/20 border-b border-neon-green/30 px-4 py-3">
+          <div className="max-w-lg mx-auto flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-neon-green/20 flex items-center justify-center flex-shrink-0">
+              <Smartphone size={20} className="text-neon-green" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white">Add RideOut to your Home Screen</p>
+              <a
+                href="https://support.apple.com/en-au/guide/iphone/iph42ab2f3a7/ios"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-neon-green hover:underline"
+              >
+                Tap here for instructions →
+              </a>
+            </div>
+            <button
+              onClick={dismissInstallBanner}
+              className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-dark-card/50 transition-all flex-shrink-0"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -408,29 +455,28 @@ const Feed = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50"
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 overflow-hidden"
         >
-          <div className="h-full flex flex-col max-w-lg mx-auto">
+          <div className="h-full max-h-full flex flex-col max-w-lg mx-auto overflow-hidden">
             {/* Header */}
-            <div className="p-4 border-b border-dark-border flex items-center gap-3">
+            <div className="p-4 pt-14 border-b border-dark-border flex items-center gap-3">
               <button
                 onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-                className="p-2 -ml-2 text-gray-400 hover:text-white"
+                className="w-12 h-12 rounded-full bg-dark-card flex items-center justify-center text-white active:bg-dark-border"
               >
-                <X size={24} />
+                <X size={28} />
               </button>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search riders..."
-                autoFocus
                 className="flex-1 px-4 py-2 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-blue"
               />
             </div>
 
             {/* User List */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 pb-40">
               {allUsers.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Search size={32} className="mx-auto mb-2 opacity-50" />

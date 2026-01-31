@@ -1,5 +1,5 @@
-// Service Worker v1.0.2 - Force update
-const VERSION = '1.0.2';
+// Service Worker v1.6.4 - Phone number required for new signups
+const VERSION = '1.6.4';
 
 self.addEventListener('install', (event) => {
   // Take control immediately

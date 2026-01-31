@@ -260,7 +260,7 @@ const Chat = () => {
           </div>
 
           {/* Input */}
-          <div className="sticky bottom-20 p-4 bg-dark-bg border-t border-dark-border">
+          <div className="sticky bottom-28 p-4 bg-dark-bg border-t border-dark-border safe-bottom">
             <div className="flex gap-3 items-center">
               <input
                 type="text"

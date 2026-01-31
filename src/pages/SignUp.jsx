@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, AtSign, Check, X, Users } from 'lucide-react';
+import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, AtSign, Check, X, Users, Phone } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,7 @@ import { awardRegistrationPoints } from '../services/pointsService';
 const SignUp = () => {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [streetName, setStreetName] = useState('');
@@ -70,6 +71,11 @@ const SignUp = () => {
       return;
     }
 
+    if (!phone || phone.length < 10) {
+      setError('Please enter a valid phone number');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -83,8 +89,8 @@ const SignUp = () => {
     setLoading(true);
 
     try {
-      console.log('Starting signup with:', { email, streetName });
-      const newUser = await signUp(email, password, streetName, '', '', '', referralCode);
+      console.log('Starting signup with:', { email, streetName, phone });
+      const newUser = await signUp(email, password, streetName, '', '', phone, referralCode);
       // Award registration points
       await awardRegistrationPoints(newUser.uid, referralCode || null);
       console.log('Signup successful, navigating to onboarding');
@@ -195,6 +201,24 @@ const SignUp = () => {
               required
               className="w-full pl-12 pr-4 py-4 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all"
             />
+          </div>
+
+          {/* Phone Number */}
+          <div>
+            <div className="relative">
+              <Phone size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Mobile number (e.g. +44 7700 900000)"
+                required
+                className="w-full pl-12 pr-4 py-4 bg-dark-card border border-dark-border rounded-xl text-white placeholder-gray-500 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all"
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              For ride alerts and emergency contact
+            </p>
           </div>
 
           {/* Password */}

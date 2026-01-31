@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Auto-update checker
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.3.0';
 
 const checkForUpdates = async () => {
   try {
@@ -42,6 +42,7 @@ import RiderMap from './pages/RiderMap';
 import RideAnnouncements from './pages/RideAnnouncements';
 import Leaderboard from './pages/Leaderboard';
 import EditPost from './pages/EditPost';
+import RateMyRide from './pages/RateMyRide';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -126,6 +127,7 @@ function AppRoutes() {
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/rate-my-ride" element={<RateMyRide />} />
       </Route>
       
       <Route path="*" element={<Navigate to="/" replace />} />
