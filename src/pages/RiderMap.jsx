@@ -16,7 +16,8 @@ import {
   Clock,
   MapPin,
   UserCheck,
-  Tag
+  Tag,
+  Crosshair
 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -2295,17 +2296,17 @@ const RiderMap = () => {
         </div>
       )}
 
-      {/* Track Riders Button */}
-      <div className="fixed right-4 top-96" style={{ zIndex: 10 }}>
+      {/* Track Riders Button - always visible */}
+      <div className="fixed right-4 top-[304px]" style={{ zIndex: 10 }}>
         <button
           onClick={() => setShowTrackModal(true)}
           className={`p-3 backdrop-blur rounded-xl shadow-xl relative ${
             activeTracks.length > 0
-              ? 'bg-neon-green/90 border border-neon-green'
+              ? 'bg-neon-green border border-neon-green'
               : 'bg-dark-card/95 border border-white/10'
           }`}
         >
-          <Navigation size={20} className={activeTracks.length > 0 ? 'text-dark-bg' : 'text-white'} />
+          <Crosshair size={20} className={activeTracks.length > 0 ? 'text-dark-bg' : 'text-neon-green'} />
           {activeTracks.length > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-dark-bg text-neon-green text-xs font-bold rounded-full flex items-center justify-center border border-neon-green">
               {activeTracks.length}
