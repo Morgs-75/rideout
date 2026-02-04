@@ -22,6 +22,7 @@ import { demoPosts } from '../utils/demoStore';
 import PostCard from '../components/PostCard';
 import ReportModal from '../components/ReportModal';
 import InviteModal from '../components/InviteModal';
+import { FeedSkeleton } from '../components/Skeletons';
 
 // Search functionality added
 const Feed = () => {
@@ -374,24 +375,7 @@ const Feed = () => {
       {/* Content */}
       <div className="max-w-lg mx-auto px-4 py-4">
         {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-dark-card rounded-2xl overflow-hidden">
-                <div className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full skeleton"></div>
-                  <div className="flex-1">
-                    <div className="h-4 w-24 skeleton rounded"></div>
-                    <div className="h-3 w-16 skeleton rounded mt-1"></div>
-                  </div>
-                </div>
-                <div className="aspect-square skeleton"></div>
-                <div className="p-4">
-                  <div className="h-4 w-32 skeleton rounded"></div>
-                  <div className="h-4 w-full skeleton rounded mt-2"></div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <FeedSkeleton count={3} />
         ) : posts.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

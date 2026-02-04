@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Admin utilities (available in browser console as window.adminCleanup)
+import './utils/adminCleanup';
 
 // Auto-update checker
 const APP_VERSION = '1.3.0';
@@ -43,6 +47,11 @@ import RideAnnouncements from './pages/RideAnnouncements';
 import Leaderboard from './pages/Leaderboard';
 import EditPost from './pages/EditPost';
 import RateMyRide from './pages/RateMyRide';
+import BlockedUsers from './pages/BlockedUsers';
+import PrivacySettings from './pages/PrivacySettings';
+import HelpCenter from './pages/HelpCenter';
+import ReportProblem from './pages/ReportProblem';
+import TrackingManagement from './pages/TrackingManagement';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -128,6 +137,11 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/rate-my-ride" element={<RateMyRide />} />
+        <Route path="/blocked-users" element={<BlockedUsers />} />
+        <Route path="/privacy-settings" element={<PrivacySettings />} />
+        <Route path="/help-center" element={<HelpCenter />} />
+        <Route path="/report-problem" element={<ReportProblem />} />
+        <Route path="/tracking" element={<TrackingManagement />} />
       </Route>
       
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -145,11 +159,13 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

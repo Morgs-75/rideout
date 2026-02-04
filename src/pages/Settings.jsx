@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, User, Bell, Shield, HelpCircle, LogOut, ChevronRight, MapPin, Volume2 } from 'lucide-react';
+import { ArrowLeft, User, Bell, Shield, HelpCircle, LogOut, ChevronRight, MapPin, Volume2, Navigation } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Settings = () => {
@@ -190,14 +190,33 @@ const Settings = () => {
         <div className="mb-6">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">Privacy & Safety</h3>
           <div className="bg-dark-card border border-dark-border rounded-2xl overflow-hidden">
-            <button className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all border-b border-dark-border">
+            <button
+              onClick={() => navigate('/tracking')}
+              className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all border-b border-dark-border"
+            >
+              <div className="flex items-center gap-3">
+                <Navigation size={20} className="text-neon-green" />
+                <div>
+                  <span>Tracking Management</span>
+                  <p className="text-xs text-gray-500">Manage who can track you</p>
+                </div>
+              </div>
+              <ChevronRight size={18} className="text-gray-500" />
+            </button>
+            <button
+              onClick={() => navigate('/blocked-users')}
+              className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all border-b border-dark-border"
+            >
               <div className="flex items-center gap-3">
                 <Shield size={20} className="text-gray-400" />
                 <span>Blocked Users</span>
               </div>
               <ChevronRight size={18} className="text-gray-500" />
             </button>
-            <button className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all">
+            <button
+              onClick={() => navigate('/privacy-settings')}
+              className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all"
+            >
               <div className="flex items-center gap-3">
                 <Shield size={20} className="text-gray-400" />
                 <span>Privacy Settings</span>
@@ -211,14 +230,20 @@ const Settings = () => {
         <div className="mb-6">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">Support</h3>
           <div className="bg-dark-card border border-dark-border rounded-2xl overflow-hidden">
-            <button className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all border-b border-dark-border">
+            <button
+              onClick={() => navigate('/help-center')}
+              className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all border-b border-dark-border"
+            >
               <div className="flex items-center gap-3">
                 <HelpCircle size={20} className="text-gray-400" />
                 <span>Help Center</span>
               </div>
               <ChevronRight size={18} className="text-gray-500" />
             </button>
-            <button className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all">
+            <button
+              onClick={() => navigate('/report-problem')}
+              className="w-full flex items-center justify-between p-4 hover:bg-dark-surface transition-all"
+            >
               <div className="flex items-center gap-3">
                 <HelpCircle size={20} className="text-gray-400" />
                 <span>Report a Problem</span>
@@ -235,7 +260,7 @@ const Settings = () => {
         </button>
 
         {/* Version */}
-        <p className="text-center text-xs text-gray-600 mt-8">RideOut v1.0.0</p>
+        <p className="text-center text-xs text-gray-600 mt-8">RideOut v2.0.0</p>
       </div>
 
       {/* Logout Confirmation */}

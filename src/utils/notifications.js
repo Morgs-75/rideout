@@ -9,7 +9,12 @@ export const NOTIFICATION_TYPES = {
   FOLLOW: 'follow',
   FRIEND_POST: 'friend_post',
   PATROL_ALERT: 'patrol_alert',
-  LIVERIDE_INVITE: 'liveride_invite'
+  LIVERIDE_INVITE: 'liveride_invite',
+  // Tracking notifications
+  TRACK_REQUEST: 'track_request',
+  TRACK_APPROVED: 'track_approved',
+  TRACK_REJECTED: 'track_rejected',
+  TRACK_REVOKED: 'track_revoked'
 };
 
 /**
@@ -125,4 +130,53 @@ export const notifyLiveRideViewers = async (viewerIds, fromUser, rideId) => {
     notifyLiveRideInvite(viewerId, fromUser, rideId)
   );
   await Promise.all(promises);
+};
+
+/**
+ * Create a track request notification
+ */
+export const notifyTrackRequest = async (targetUserId, fromUser, requestId) => {
+  await createNotification(targetUserId, NOTIFICATION_TYPES.TRACK_REQUEST, {
+    fromUserId: fromUser.uid,
+    fromUserName: fromUser.streetName,
+    fromUserAvatar: fromUser.avatar || '',
+    requestId,
+    message: `${fromUser.streetName} wants to track your location`
+  });
+};
+
+/**
+ * Create a track approved notification
+ */
+export const notifyTrackApproved = async (requesterId, fromUser) => {
+  await createNotification(requesterId, NOTIFICATION_TYPES.TRACK_APPROVED, {
+    fromUserId: fromUser.uid,
+    fromUserName: fromUser.streetName,
+    fromUserAvatar: fromUser.avatar || '',
+    message: `${fromUser.streetName} approved your tracking request`
+  });
+};
+
+/**
+ * Create a track rejected notification
+ */
+export const notifyTrackRejected = async (requesterId, fromUser) => {
+  await createNotification(requesterId, NOTIFICATION_TYPES.TRACK_REJECTED, {
+    fromUserId: fromUser.uid,
+    fromUserName: fromUser.streetName,
+    fromUserAvatar: fromUser.avatar || '',
+    message: `${fromUser.streetName} declined your tracking request`
+  });
+};
+
+/**
+ * Create a track revoked notification
+ */
+export const notifyTrackRevoked = async (targetUserId, fromUser) => {
+  await createNotification(targetUserId, NOTIFICATION_TYPES.TRACK_REVOKED, {
+    fromUserId: fromUser.uid,
+    fromUserName: fromUser.streetName,
+    fromUserAvatar: fromUser.avatar || '',
+    message: `${fromUser.streetName} stopped tracking`
+  });
 };

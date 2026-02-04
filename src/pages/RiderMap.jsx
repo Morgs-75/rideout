@@ -42,6 +42,16 @@ import {
 } from '../services/liveRideService';
 import { notifyLiveRideViewers } from '../utils/notifications';
 
+// Tracking imports
+import TrackRequestModal from '../components/TrackRequestModal';
+import TrackedRidersOverlay from '../components/TrackedRidersOverlay';
+import {
+  subscribeToTracksAsTracker,
+  subscribeToTrackedLocations,
+  updateTrackerLocation,
+  getActiveTracksAsTracked
+} from '../services/trackService';
+
 mapboxgl.accessToken = 'pk.eyJ1IjoidHJveW03IiwiYSI6ImNta3M3bGw1azFiamEza3BweDJpMGswa3kifQ.P8EVLVOr4ChTrpkyCIg36A';
 
 // Alert types with expiration times
@@ -233,6 +243,13 @@ const RiderMap = () => {
   const liveRideMarkersRef = useRef(new Map());
   const liveRideWatchIdRef = useRef(null);
   const lastPositionUpdateRef = useRef(0);
+
+  // Tracking state
+  const [showTrackModal, setShowTrackModal] = useState(false);
+  const [activeTracks, setActiveTracks] = useState([]); // Riders I'm tracking
+  const [trackedLocations, setTrackedLocations] = useState([]); // Their locations
+  const [beingTrackedBy, setBeingTrackedBy] = useState([]); // Who is tracking me
+  const trackedMarkersRef = useRef(new Map());
 
   const MAP_STYLES = {
     snap: 'mapbox://styles/mapbox/standard',
@@ -686,22 +703,6 @@ const RiderMap = () => {
     const labelWidth = Math.max(50, Math.min(80, 40 + zoom * 2));
 
     // Add new rider markers
-    // Add pulsate animation style if not exists
-    if (!document.getElementById('rider-pulsate-style')) {
-      const style = document.createElement('style');
-      style.id = 'rider-pulsate-style';
-      style.textContent = `
-        @keyframes riderPulsate {
-          0%, 100% { transform: scale(1); filter: brightness(1.2) saturate(1.3) drop-shadow(0 0 8px rgba(0,212,255,0.8)); }
-          50% { transform: scale(1.08); filter: brightness(1.4) saturate(1.5) drop-shadow(0 0 15px rgba(0,212,255,1)); }
-        }
-        @keyframes riderPulsateOffline {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.03); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
 
     riders.forEach(rider => {
       const el = document.createElement('div');
@@ -719,7 +720,7 @@ const RiderMap = () => {
           ` : ''}
           <img
             src="${riderIconUrl}"
-            style="width: ${iconSize}px; height: auto; ${isOnline ? 'animation: riderPulsate 2s ease-in-out infinite; filter: brightness(1.2) saturate(1.3) drop-shadow(0 0 8px rgba(0,212,255,0.8));' : 'animation: riderPulsateOffline 3s ease-in-out infinite; filter: grayscale(70%) opacity(0.7);'}"
+            style="width: ${iconSize}px; height: auto; ${isOnline ? 'filter: brightness(1.2) saturate(1.3) drop-shadow(0 0 8px rgba(0,212,255,0.8));' : 'filter: grayscale(70%) opacity(0.7);'}"
           />
           ${isOnline ? `<div style="position: absolute; top: 0; right: 0; width: 12px; height: 12px; background: #39FF14; border-radius: 50%; border: 2px solid #1a1a1a;"></div>` : ''}
         </div>
@@ -1125,6 +1126,134 @@ const RiderMap = () => {
 
     return () => unsubscribe();
   }, [user?.uid]);
+
+  // Subscribe to tracking relationships
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Subscribe to people I'm tracking
+    const unsubTracks = subscribeToTracksAsTracker(user.uid, (tracks) => {
+      setActiveTracks(tracks);
+    });
+
+    // Also fetch who is tracking me (for location updates)
+    const fetchTrackers = async () => {
+      try {
+        const trackers = await getActiveTracksAsTracked(user.uid);
+        setBeingTrackedBy(trackers);
+      } catch (error) {
+        console.error('Error fetching trackers:', error);
+      }
+    };
+    fetchTrackers();
+
+    return () => unsubTracks();
+  }, [user?.uid]);
+
+  // Subscribe to tracked rider locations
+  useEffect(() => {
+    if (activeTracks.length === 0) {
+      setTrackedLocations([]);
+      return;
+    }
+
+    const trackedIds = activeTracks.map(t => t.trackedId);
+    const unsubLocations = subscribeToTrackedLocations(trackedIds, (locations) => {
+      setTrackedLocations(locations);
+    });
+
+    return () => unsubLocations();
+  }, [activeTracks]);
+
+  // Update my location for trackers (piggyback on existing location updates)
+  useEffect(() => {
+    if (!user?.uid || !userProfile || beingTrackedBy.length === 0) return;
+    if (!userLocation) return;
+
+    // Update tracker location when being tracked
+    updateTrackerLocation(
+      user.uid,
+      userProfile.streetName,
+      userProfile.avatar,
+      userLocation.lat,
+      userLocation.lng
+    ).catch(err => console.error('Error updating tracker location:', err));
+  }, [userLocation, user?.uid, userProfile, beingTrackedBy.length]);
+
+  // Add/update tracked rider markers on map
+  useEffect(() => {
+    if (!map.current || !mapReady) return;
+
+    // Remove markers for riders no longer tracked
+    const currentTrackedIds = new Set(trackedLocations.map(l => l.userId));
+    trackedMarkersRef.current.forEach((marker, id) => {
+      if (!currentTrackedIds.has(id)) {
+        marker.remove();
+        trackedMarkersRef.current.delete(id);
+      }
+    });
+
+    // Add/update markers for tracked riders
+    trackedLocations.forEach(loc => {
+      if (!loc.location) return;
+
+      const lat = loc.location.latitude;
+      const lng = loc.location.longitude;
+      const existingMarker = trackedMarkersRef.current.get(loc.userId);
+
+      if (existingMarker) {
+        // Update existing marker position
+        existingMarker.setLngLat([lng, lat]);
+      } else {
+        // Create new marker with green styling
+        const el = document.createElement('div');
+        el.className = 'tracked-rider-marker';
+        el.innerHTML = `
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00D4FF, #00FF88);
+            border: 3px solid #00FF88;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+            overflow: hidden;
+          ">
+            ${loc.avatarUrl
+              ? `<img src="${loc.avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+              : `<span style="font-weight: bold; color: #0a0a0a;">${loc.streetName?.[0]?.toUpperCase() || '?'}</span>`
+            }
+          </div>
+          <div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #00FF88;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3">
+              <path d="M12 2L12 22M12 2L5 9M12 2L19 9"/>
+            </svg>
+          </div>
+        `;
+        el.style.position = 'relative';
+        el.style.cursor = 'pointer';
+
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .addTo(map.current);
+
+        trackedMarkersRef.current.set(loc.userId, marker);
+      }
+    });
+  }, [trackedLocations, mapReady]);
 
   // Manage draggable meet point marker
   useEffect(() => {
@@ -2166,6 +2295,50 @@ const RiderMap = () => {
         </div>
       )}
 
+      {/* Track Riders Button */}
+      <div className="fixed right-4 top-96" style={{ zIndex: 10 }}>
+        <button
+          onClick={() => setShowTrackModal(true)}
+          className={`p-3 backdrop-blur rounded-xl shadow-xl relative ${
+            activeTracks.length > 0
+              ? 'bg-neon-green/90 border border-neon-green'
+              : 'bg-dark-card/95 border border-white/10'
+          }`}
+        >
+          <Navigation size={20} className={activeTracks.length > 0 ? 'text-dark-bg' : 'text-white'} />
+          {activeTracks.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-dark-bg text-neon-green text-xs font-bold rounded-full flex items-center justify-center border border-neon-green">
+              {activeTracks.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Tracked Riders Overlay */}
+      <AnimatePresence>
+        {activeTracks.length > 0 && (
+          <TrackedRidersOverlay
+            trackedRiders={activeTracks.map(track => ({
+              track,
+              location: trackedLocations.find(l => l.userId === track.trackedId)
+            }))}
+            userLocation={userLocation}
+            onCenterOnRider={(location) => {
+              if (map.current && location?.location) {
+                map.current.flyTo({
+                  center: [location.location.longitude, location.location.latitude],
+                  zoom: 15
+                });
+              }
+            }}
+            onStopTracking={(track) => {
+              setActiveTracks(prev => prev.filter(t => t.id !== track.id));
+            }}
+            currentUser={{ uid: user?.uid, streetName: userProfile?.streetName, avatar: userProfile?.avatar }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Notification */}
       <AnimatePresence>
         {showNotification && (
@@ -2711,14 +2884,14 @@ const RiderMap = () => {
         )}
       </AnimatePresence>
 
-      {/* Viewing Ride Card - floating card when watching someone's ride */}
+      {/* Viewing Ride Card - minimal fire indicator when watching someone's ride */}
       <AnimatePresence>
         {viewingRideId && !showLiveRidesPanel && (
           <motion.div
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 100 }}
-            className="fixed top-44 right-4 w-64 z-10"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-10"
           >
             {(() => {
               const viewedRide = viewableLiveRides.find(r => r.id === viewingRideId);
@@ -2729,12 +2902,24 @@ const RiderMap = () => {
                   onViewOnMap={() => handleViewRideOnMap(viewedRide)}
                   onStopWatching={handleStopWatchingRide}
                   isViewing={true}
+                  minimal={true}
                 />
               );
             })()}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Track Request Modal */}
+      <TrackRequestModal
+        isOpen={showTrackModal}
+        onClose={() => setShowTrackModal(false)}
+        onRequestSent={(targetUser) => {
+          setNotificationMessage(`Tracking request sent to ${targetUser.streetName}`);
+          setShowNotification(true);
+          setTimeout(() => setShowNotification(false), 3000);
+        }}
+      />
 
       {/* CSS for ping animation */}
       <style>{`

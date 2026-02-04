@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import LazyImage from './LazyImage';
+import LazyVideo from './LazyVideo';
 import {
   Heart,
   MessageCircle,
@@ -75,6 +77,8 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   const [hasReshared, setHasReshared] = useState(post.resharedBy?.includes(user?.uid) || false);
   const [resharing, setResharing] = useState(false);
   const [firstComment, setFirstComment] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Handle music playback
   const toggleMusic = () => {
@@ -429,11 +433,10 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   };
 
   const handleDeletePost = async () => {
-    if (!confirm('Delete this post? This cannot be undone.')) return;
-
-    setShowMenu(false);
+    setDeleting(true);
     try {
       await deleteDoc(doc(db, 'posts', post.id));
+      setShowDeleteConfirm(false);
       // Optionally trigger a refresh or remove from UI
       if (onUpdate) {
         onUpdate();
@@ -442,7 +445,9 @@ const PostCard = ({ post, onReport, onUpdate }) => {
       navigate('/feed');
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('Failed to delete post.');
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+      alert('Failed to delete post. Please try again.');
     }
   };
 
@@ -592,7 +597,7 @@ const PostCard = ({ post, onReport, onUpdate }) => {
                       Edit Post
                     </button>
                     <button
-                      onClick={handleDeletePost}
+                      onClick={() => { setShowMenu(false); setShowDeleteConfirm(true); }}
                       className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-dark-card transition-all text-red-400"
                     >
                       <Trash2 size={18} />
@@ -687,10 +692,11 @@ const PostCard = ({ post, onReport, onUpdate }) => {
               ))}
             </>
           ) : (
-            <img
+            <LazyImage
               src={post.mediaUrl}
               alt=""
-              className="w-full h-full object-cover"
+              className="w-full h-full"
+              aspectRatio="1/1"
             />
           )}
           {post.mediaType === 'video' && !isPlaying && (
@@ -730,16 +736,59 @@ const PostCard = ({ post, onReport, onUpdate }) => {
             Alert Location (1.5km radius)
           </div>
         </div>
-      ) : post.isTextOnly && post.caption ? (
+      ) : post.isTextOnly && (post.textContent || post.caption) ? (
         <div
-          className="relative aspect-square bg-gradient-to-br from-dark-surface via-dark-bg to-dark-card flex items-center justify-center p-8 cursor-pointer"
+          className="relative w-full cursor-pointer overflow-hidden"
+          style={{
+            background: post.textBackground || 'linear-gradient(135deg, #00D4FF 0%, #39FF14 100%)',
+            aspectRatio: '1 / 1',
+            minHeight: '300px'
+          }}
           onClick={() => navigate(`/post/${post.id}`)}
         >
-          <p className="text-white text-xl md:text-2xl text-center font-medium leading-relaxed max-h-full overflow-hidden">
-            {post.caption.length > 280 ? post.caption.slice(0, 280) + '...' : post.caption}
+          {/* Text content - positioned or centered */}
+          <p
+            className={`absolute max-w-[90%] text-center leading-relaxed ${post.textFont || 'font-medium'}`}
+            style={{
+              left: post.textX ? `${post.textX}%` : '50%',
+              top: post.textY ? `${post.textY}%` : '50%',
+              transform: 'translate(-50%, -50%)',
+              fontSize: post.textSize ? `${post.textSize}px` : '24px',
+              color: post.textColor || '#FFFFFF',
+              textShadow: '2px 2px 8px rgba(0,0,0,0.5)'
+            }}
+          >
+            {(post.textContent || post.caption).length > 280
+              ? (post.textContent || post.caption).slice(0, 280) + '...'
+              : (post.textContent || post.caption)}
           </p>
-          {/* Decorative gradient border */}
-          <div className="absolute inset-0 pointer-events-none border-2 border-neon-blue/20 rounded-none" />
+
+          {/* Stickers */}
+          {post.textStickers?.map((sticker, i) => (
+            <div
+              key={i}
+              className="absolute"
+              style={{
+                left: `${sticker.x}%`,
+                top: `${sticker.y}%`,
+                transform: 'translate(-50%, -50%)',
+                fontSize: `${sticker.size || 40}px`
+              }}
+            >
+              {sticker.emoji}
+            </div>
+          ))}
+
+          {/* Music indicator */}
+          {post.music && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMusic(); }}
+              className="absolute bottom-3 left-3 px-3 py-1.5 bg-black/60 rounded-full flex items-center gap-2 text-white text-sm"
+            >
+              {isMusicPlaying ? <Volume2 size={16} /> : <Music size={16} />}
+              <span className="max-w-20 truncate">{post.music.name}</span>
+            </button>
+          )}
         </div>
       ) : null}
 
@@ -933,8 +982,42 @@ const PostCard = ({ post, onReport, onUpdate }) => {
           </button>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-dark-card border border-dark-border rounded-2xl p-6 max-w-sm w-full"
+          >
+            <h3 className="text-lg font-semibold text-white mb-2">Delete Post?</h3>
+            <p className="text-gray-400 text-sm mb-6">This action cannot be undone. Your post will be permanently removed.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl font-medium bg-dark-surface text-gray-300 border border-dark-border"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePost}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl font-medium bg-red-500 text-white flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 };
 
-export default PostCard;
+export default memo(PostCard);

@@ -1,14 +1,15 @@
 // LiveRideCard - Preview card when viewing someone else's live ride
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Clock, Route, Eye, EyeOff, Navigation, Globe } from 'lucide-react';
+import { MapPin, Clock, Route, Eye, EyeOff, Navigation, Globe, X } from 'lucide-react';
 import { formatDuration, formatDistance } from '../services/liveRideService';
 
 const LiveRideCard = ({
   ride,
   onViewOnMap,
   onStopWatching,
-  isViewing = false
+  isViewing = false,
+  minimal = false // New prop: when true, shows minimal fire-only view
 }) => {
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -43,6 +44,49 @@ const LiveRideCard = ({
 
   const isPaused = ride.status === 'paused';
   const isPublic = ride.isPublic || false;
+
+  // Minimal viewer mode - just shows fire indicator
+  if (minimal && isViewing) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        className="flex items-center gap-2"
+      >
+        {/* Fire indicator pill */}
+        <div className="bg-dark-card/90 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 border border-hot-orange/30 shadow-lg">
+          {/* Animated fire */}
+          <div className="relative">
+            <span className="text-2xl animate-pulse">🔥</span>
+            <div className="absolute inset-0 blur-sm opacity-50">
+              <span className="text-2xl">🔥</span>
+            </div>
+          </div>
+
+          {/* Rider name */}
+          <span className="text-white font-medium text-sm">{ride.streetNameDisplay || ride.streetName}</span>
+
+          {/* Live badge */}
+          <div className="flex items-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-red-500'}`}>
+              {!isPaused && (
+                <div className="absolute w-2 h-2 bg-red-500 rounded-full animate-ping" />
+              )}
+            </div>
+          </div>
+
+          {/* Stop watching button */}
+          <button
+            onClick={onStopWatching}
+            className="p-1 text-gray-400 hover:text-white rounded-full hover:bg-dark-surface transition-all"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

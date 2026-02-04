@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Heart, MessageCircle, ChevronUp, ChevronDown, Send, MapPin, Share2, MoreHorizontal, Pencil, Trash2, X, Check } from 'lucide-react';
-import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, updateDoc, deleteDoc, increment, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, updateDoc, deleteDoc, increment, arrayUnion, arrayRemove, serverTimestamp, limit, startAfter } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import ShareModal from '../components/ShareModal';
@@ -23,6 +23,10 @@ const PostDetail = () => {
   const [editingText, setEditingText] = useState('');
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [commentLikes, setCommentLikes] = useState({});
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+  const [lastCommentDoc, setLastCommentDoc] = useState(null);
+  const COMMENTS_PER_PAGE = 10;
 
   useEffect(() => {
     fetchPost();
@@ -86,22 +90,68 @@ const PostDetail = () => {
     }
   };
 
-  const fetchComments = async () => {
+  const fetchComments = async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMoreComments(true);
+    }
+
     try {
-      // Simple query without orderBy to avoid index requirement
-      const commentsQuery = query(collection(db, 'comments'), where('postId', '==', postId));
+      // Build query with pagination
+      let commentsQuery;
+      if (loadMore && lastCommentDoc) {
+        commentsQuery = query(
+          collection(db, 'comments'),
+          where('postId', '==', postId),
+          limit(COMMENTS_PER_PAGE + 1)
+        );
+      } else {
+        commentsQuery = query(
+          collection(db, 'comments'),
+          where('postId', '==', postId),
+          limit(COMMENTS_PER_PAGE + 1)
+        );
+      }
+
       const snapshot = await getDocs(commentsQuery);
-      const commentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let commentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
       // Sort client-side by createdAt descending
       commentsData.sort((a, b) => {
         const aTime = a.createdAt?.toDate?.() || new Date(0);
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      setComments(commentsData);
+
+      // Check if there are more comments
+      if (commentsData.length > COMMENTS_PER_PAGE) {
+        setHasMoreComments(true);
+        commentsData = commentsData.slice(0, COMMENTS_PER_PAGE);
+      } else {
+        setHasMoreComments(false);
+      }
+
+      if (loadMore) {
+        // Filter out duplicates when loading more
+        const existingIds = new Set(comments.map(c => c.id));
+        const newComments = commentsData.filter(c => !existingIds.has(c.id));
+        setComments(prev => [...prev, ...newComments]);
+      } else {
+        setComments(commentsData);
+      }
+
+      if (snapshot.docs.length > 0) {
+        setLastCommentDoc(snapshot.docs[snapshot.docs.length - 1]);
+      }
     } catch (error) {
-      console.error('Error fetching comments:', error);
-      setComments([]);
+      setComments(loadMore ? comments : []);
+    } finally {
+      setLoadingMoreComments(false);
+    }
+  };
+
+  const loadMoreComments = () => {
+    if (!loadingMoreComments && hasMoreComments) {
+      fetchComments(true);
     }
   };
 
@@ -244,10 +294,52 @@ const PostDetail = () => {
           </Link>
         </div>
 
-        {/* Media */}
-        <div className="aspect-square bg-dark-card">
-          {post.mediaType === 'video' ? <video src={post.mediaUrl} className="w-full h-full object-cover" controls loop playsInline /> : <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" />}
-        </div>
+        {/* Media or Text Post */}
+        {post.isTextOnly ? (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{
+              background: post.textBackground || 'linear-gradient(135deg, #00D4FF 0%, #39FF14 100%)',
+              aspectRatio: '1 / 1',
+              minHeight: '300px'
+            }}
+          >
+            {/* Text content - positioned or centered */}
+            <p
+              className={`absolute max-w-[90%] text-center leading-relaxed ${post.textFont || 'font-medium'}`}
+              style={{
+                left: post.textX ? `${post.textX}%` : '50%',
+                top: post.textY ? `${post.textY}%` : '50%',
+                transform: 'translate(-50%, -50%)',
+                fontSize: post.textSize ? `${post.textSize}px` : '24px',
+                color: post.textColor || '#FFFFFF',
+                textShadow: '2px 2px 8px rgba(0,0,0,0.5)'
+              }}
+            >
+              {post.textContent || post.caption}
+            </p>
+
+            {/* Stickers */}
+            {post.textStickers?.map((sticker, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${sticker.x}%`,
+                  top: `${sticker.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: `${sticker.size || 40}px`
+                }}
+              >
+                {sticker.emoji}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="aspect-square bg-dark-card">
+            {post.mediaType === 'video' ? <video src={post.mediaUrl} className="w-full h-full object-cover" controls loop playsInline /> : <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" />}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="p-4">
@@ -359,6 +451,24 @@ const PostDetail = () => {
                 )}
               </div>
             ))}
+
+            {/* Load More Comments */}
+            {hasMoreComments && comments.length >= COMMENTS_PER_PAGE && (
+              <button
+                onClick={loadMoreComments}
+                disabled={loadingMoreComments}
+                className="w-full py-3 text-center text-neon-blue text-sm font-medium hover:bg-dark-card rounded-xl transition-all"
+              >
+                {loadingMoreComments ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-neon-blue border-t-transparent rounded-full animate-spin" />
+                    Loading...
+                  </div>
+                ) : (
+                  'Load more comments'
+                )}
+              </button>
+            )}
           </div>
 
         </div>
