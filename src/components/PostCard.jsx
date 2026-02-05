@@ -25,7 +25,8 @@ import {
   VolumeX
 } from 'lucide-react';
 import { doc, updateDoc, increment, arrayUnion, arrayRemove, collection, query, where, getDocs, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { demoPosts } from '../utils/demoStore';
 import { notifyLike, notifyUpvote, notifyFollow } from '../utils/notifications';
@@ -435,13 +436,42 @@ const PostCard = ({ post, onReport, onUpdate }) => {
   const handleDeletePost = async () => {
     setDeleting(true);
     try {
+      // Delete media from Storage if exists
+      if (post.mediaUrl && post.mediaUrl.includes('firebase')) {
+        try {
+          // Extract path from URL - posts/{userId}/{filename}
+          const urlPath = decodeURIComponent(post.mediaUrl.split('/o/')[1]?.split('?')[0]);
+          if (urlPath) {
+            const mediaRef = ref(storage, urlPath);
+            await deleteObject(mediaRef);
+          }
+        } catch (storageError) {
+          // Media may already be deleted or not exist, continue
+          console.log('Media deletion skipped:', storageError.message);
+        }
+      }
+
+      // Delete comments subcollection
+      try {
+        const commentsRef = collection(db, 'posts', post.id, 'comments');
+        const commentsSnap = await getDocs(commentsRef);
+        const deletePromises = commentsSnap.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+      } catch (commentsError) {
+        console.log('Comments deletion skipped:', commentsError.message);
+      }
+
+      // Delete the post document
       await deleteDoc(doc(db, 'posts', post.id));
+
+      setDeleting(false);
       setShowDeleteConfirm(false);
-      // Optionally trigger a refresh or remove from UI
+
+      // Trigger refresh or remove from UI
       if (onUpdate) {
         onUpdate();
       }
-      // Navigate away or the parent will handle removing from list
+      // Navigate away
       navigate('/feed');
     } catch (error) {
       console.error('Error deleting post:', error);
