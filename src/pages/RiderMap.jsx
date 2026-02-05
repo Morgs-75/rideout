@@ -1737,91 +1737,106 @@ const RiderMap = () => {
 
   // Generate a static ride image (fallback for iOS)
   const generateRideImage = async (rideData) => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 600;
-      canvas.height = 600;
-      const ctx = canvas.getContext('2d');
+    return new Promise((resolve, reject) => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
 
-      const pathPoints = rideData.pathPoints || [];
-
-      // Dark background
-      ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(0, 0, 600, 600);
-
-      if (pathPoints.length >= 2) {
-        const sortedPoints = [...pathPoints].sort((a, b) => a.time - b.time);
-
-        // Calculate bounds
-        let minLat = Infinity, maxLat = -Infinity;
-        let minLng = Infinity, maxLng = -Infinity;
-        sortedPoints.forEach(p => {
-          minLat = Math.min(minLat, p.lat);
-          maxLat = Math.max(maxLat, p.lat);
-          minLng = Math.min(minLng, p.lng);
-          maxLng = Math.max(maxLng, p.lng);
-        });
-
-        const latPad = (maxLat - minLat) * 0.15 || 0.01;
-        const lngPad = (maxLng - minLng) * 0.15 || 0.01;
-        minLat -= latPad; maxLat += latPad;
-        minLng -= lngPad; maxLng += lngPad;
-
-        const toCanvas = (lat, lng) => ({
-          x: ((lng - minLng) / (maxLng - minLng)) * 560 + 20,
-          y: 580 - ((lat - minLat) / (maxLat - minLat)) * 560
-        });
-
-        // Draw full trail glow
-        ctx.beginPath();
-        const start = toCanvas(sortedPoints[0].lat, sortedPoints[0].lng);
-        ctx.moveTo(start.x, start.y);
-        for (let i = 1; i < sortedPoints.length; i++) {
-          const p = toCanvas(sortedPoints[i].lat, sortedPoints[i].lng);
-          ctx.lineTo(p.x, p.y);
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
         }
-        ctx.strokeStyle = 'rgba(255, 100, 0, 0.3)';
-        ctx.lineWidth = 20;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(255, 150, 0, 0.6)';
-        ctx.lineWidth = 10;
-        ctx.stroke();
+        const pathPoints = rideData.pathPoints || [];
 
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 4;
-        ctx.stroke();
+        // Dark background
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, 600, 600);
 
-        // Start point (green)
-        const startPt = toCanvas(sortedPoints[0].lat, sortedPoints[0].lng);
-        ctx.beginPath();
-        ctx.arc(startPt.x, startPt.y, 12, 0, Math.PI * 2);
-        ctx.fillStyle = '#39FF14';
-        ctx.fill();
+        if (pathPoints.length >= 2) {
+          const sortedPoints = [...pathPoints].sort((a, b) => a.time - b.time);
 
-        // End point (blue)
-        const endPt = toCanvas(sortedPoints[sortedPoints.length - 1].lat, sortedPoints[sortedPoints.length - 1].lng);
-        ctx.beginPath();
-        ctx.arc(endPt.x, endPt.y, 10, 0, Math.PI * 2);
+          // Calculate bounds
+          let minLat = Infinity, maxLat = -Infinity;
+          let minLng = Infinity, maxLng = -Infinity;
+          sortedPoints.forEach(p => {
+            minLat = Math.min(minLat, p.lat);
+            maxLat = Math.max(maxLat, p.lat);
+            minLng = Math.min(minLng, p.lng);
+            maxLng = Math.max(maxLng, p.lng);
+          });
+
+          const latPad = (maxLat - minLat) * 0.15 || 0.01;
+          const lngPad = (maxLng - minLng) * 0.15 || 0.01;
+          minLat -= latPad; maxLat += latPad;
+          minLng -= lngPad; maxLng += lngPad;
+
+          const toCanvas = (lat, lng) => ({
+            x: ((lng - minLng) / (maxLng - minLng)) * 560 + 20,
+            y: 580 - ((lat - minLat) / (maxLat - minLat)) * 560
+          });
+
+          // Draw full trail glow
+          ctx.beginPath();
+          const start = toCanvas(sortedPoints[0].lat, sortedPoints[0].lng);
+          ctx.moveTo(start.x, start.y);
+          for (let i = 1; i < sortedPoints.length; i++) {
+            const p = toCanvas(sortedPoints[i].lat, sortedPoints[i].lng);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.strokeStyle = 'rgba(255, 100, 0, 0.3)';
+          ctx.lineWidth = 20;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(255, 150, 0, 0.6)';
+          ctx.lineWidth = 10;
+          ctx.stroke();
+
+          ctx.strokeStyle = '#FFD700';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          // Start point (green)
+          const startPt = toCanvas(sortedPoints[0].lat, sortedPoints[0].lng);
+          ctx.beginPath();
+          ctx.arc(startPt.x, startPt.y, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#39FF14';
+          ctx.fill();
+
+          // End point (blue)
+          const endPt = toCanvas(sortedPoints[sortedPoints.length - 1].lat, sortedPoints[sortedPoints.length - 1].lng);
+          ctx.beginPath();
+          ctx.arc(endPt.x, endPt.y, 10, 0, Math.PI * 2);
+          ctx.fillStyle = '#00D4FF';
+          ctx.fill();
+        }
+
+        // Stats overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(10, 10, 180, 70);
         ctx.fillStyle = '#00D4FF';
-        ctx.fill();
+        ctx.font = 'bold 16px system-ui';
+        ctx.fillText('LIVERIDE', 20, 35);
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px system-ui';
+        const distKm = rideData.totalDistanceKm?.toFixed(1) || '0.0';
+        const mins = rideData.durationMinutes || 0;
+        ctx.fillText(`${distKm} km · ${mins} min`, 20, 58);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create image blob'));
+          }
+        }, 'image/jpeg', 0.9);
+      } catch (error) {
+        reject(error);
       }
-
-      // Stats overlay
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(10, 10, 180, 70);
-      ctx.fillStyle = '#00D4FF';
-      ctx.font = 'bold 16px system-ui';
-      ctx.fillText('LIVERIDE', 20, 35);
-      ctx.fillStyle = '#fff';
-      ctx.font = '14px system-ui';
-      const distKm = rideData.totalDistanceKm?.toFixed(1) || '0.0';
-      const mins = rideData.durationMinutes || 0;
-      ctx.fillText(`${distKm} km · ${mins} min`, 20, 58);
-
-      canvas.toBlob(resolve, 'image/jpeg', 0.9);
     });
   };
 
@@ -1842,7 +1857,8 @@ const RiderMap = () => {
 
     setGeneratingVideo(true);
     try {
-      let mediaUrl, mediaType;
+      let mediaUrl = '';
+      let mediaType = 'text';
 
       // Check if video is supported and we have enough path points
       const canMakeVideo = isVideoSupported() && (completedRideData.pathPoints?.length || 0) >= 2;
@@ -1856,21 +1872,31 @@ const RiderMap = () => {
           mediaUrl = await getDownloadURL(videoRef);
           mediaType = 'video';
         } catch (videoError) {
-          console.log('Video generation failed, falling back to image:', videoError);
+          console.log('Video generation failed, trying image:', videoError);
           // Fall back to image
+          try {
+            const imageBlob = await generateRideImage(completedRideData);
+            const imageRef = ref(storage, `liverides/${user.uid}/${Date.now()}.jpg`);
+            await uploadBytes(imageRef, imageBlob);
+            mediaUrl = await getDownloadURL(imageRef);
+            mediaType = 'image';
+          } catch (imageError) {
+            console.log('Image generation also failed, posting as text:', imageError);
+            // Will post as text-only
+          }
+        }
+      } else {
+        // Try to generate image
+        try {
           const imageBlob = await generateRideImage(completedRideData);
           const imageRef = ref(storage, `liverides/${user.uid}/${Date.now()}.jpg`);
           await uploadBytes(imageRef, imageBlob);
           mediaUrl = await getDownloadURL(imageRef);
           mediaType = 'image';
+        } catch (imageError) {
+          console.log('Image generation failed, posting as text:', imageError);
+          // Will post as text-only
         }
-      } else {
-        // Generate image instead
-        const imageBlob = await generateRideImage(completedRideData);
-        const imageRef = ref(storage, `liverides/${user.uid}/${Date.now()}.jpg`);
-        await uploadBytes(imageRef, imageBlob);
-        mediaUrl = await getDownloadURL(imageRef);
-        mediaType = 'image';
       }
 
       // Create the post
@@ -1880,9 +1906,9 @@ const RiderMap = () => {
         userId: user.uid,
         streetName: userProfile?.streetName || 'Rider',
         userAvatar: userProfile?.avatar || '',
-        mediaType,
-        mediaUrl,
-        caption: `Just finished a LiveRide! ${distKm} km in ${mins} minutes 🔥 #liveride #rideout`,
+        mediaType: mediaType,
+        mediaUrl: mediaUrl,
+        caption: `Just finished a LiveRide! 🔥\n\n📍 ${distKm} km\n⏱️ ${mins} minutes\n\n#liveride #rideout`,
         hashtags: ['liveride', 'rideout'],
         likes: 0,
         likedBy: [],
