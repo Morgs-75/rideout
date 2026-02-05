@@ -17,7 +17,9 @@ import {
   MapPin,
   UserCheck,
   Tag,
-  Crosshair
+  Crosshair,
+  Play,
+  Square
 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -2269,17 +2271,29 @@ const RiderMap = () => {
         </button>
       </div>
 
-      {/* LiveRide Button - show when not in active ride */}
-      {!liveRideActive && (
-        <div className="fixed right-4 top-64" style={{ zIndex: 10 }}>
-          <button
-            onClick={() => setShowStartRideModal(true)}
-            className="p-3 bg-gradient-to-r from-neon-blue to-neon-green rounded-xl shadow-xl flex items-center gap-2"
-          >
-            <Radio size={20} className="text-dark-bg" />
-          </button>
-        </div>
-      )}
+      {/* LiveRide Button - Play/Stop */}
+      <div className="fixed right-4 top-64" style={{ zIndex: 10 }}>
+        <button
+          onClick={() => {
+            if (liveRideActive) {
+              handleEndLiveRide();
+            } else {
+              setShowStartRideModal(true);
+            }
+          }}
+          className={`p-3 rounded-xl shadow-xl flex items-center gap-2 ${
+            liveRideActive
+              ? 'bg-red-500 border border-red-400'
+              : 'bg-gradient-to-r from-neon-blue to-neon-green'
+          }`}
+        >
+          {liveRideActive ? (
+            <Square size={20} className="text-white" fill="white" />
+          ) : (
+            <Play size={20} className="text-dark-bg" fill="#0a0a0a" />
+          )}
+        </button>
+      </div>
 
       {/* Live Rides Viewer Button - show count of viewable rides */}
       {viewableLiveRides.length > 0 && !liveRideActive && (
