@@ -658,6 +658,7 @@ const RiderMap = () => {
         document.head.appendChild(style);
       }
 
+      const userName = userProfile?.streetName || 'You';
       el.innerHTML = `
         <div style="position: relative; width: 75px; height: 75px;">
           <img
@@ -668,8 +669,13 @@ const RiderMap = () => {
             src="${wheelieUrl}"
             style="position: absolute; width: 75px; height: auto; filter: drop-shadow(0 0 10px rgba(0,212,255,0.7)); animation: riderAnimUserAlt 0.8s ease-in-out infinite;"
           />
-          <div style="position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); background: #EF4444; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap;">
-            LIVE
+          <div style="position: absolute; top: -35px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;">
+            <div style="background: #EF4444; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap;">
+              LIVE
+            </div>
+            <div style="background: #1a1a1a; color: #00D4FF; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap; border: 1px solid #00D4FF;">
+              ${userName}
+            </div>
           </div>
         </div>
       `;
@@ -1415,11 +1421,13 @@ const RiderMap = () => {
               src="${wheelieUrl}"
               style="position: absolute; width: 75px; height: auto; filter: drop-shadow(0 0 10px rgba(0,212,255,0.7)); animation: riderAnimAlt-${ride.id} 0.8s ease-in-out infinite;"
             />` : ''}
-            <div style="position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); background: ${isPaused ? '#EAB308' : '#EF4444'}; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap;">
-              ${isPaused ? 'PAUSED' : 'LIVE'}
-            </div>
-            <div style="position: absolute; top: -8px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #00D4FF; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap; border: 1px solid #00D4FF;">
-              ${ride.streetName}
+            <div style="position: absolute; top: -35px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;">
+              <div style="background: ${isPaused ? '#EAB308' : '#EF4444'}; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap;">
+                ${isPaused ? 'PAUSED' : 'LIVE'}
+              </div>
+              <div style="background: #1a1a1a; color: #00D4FF; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px; white-space: nowrap; border: 1px solid #00D4FF;">
+                ${ride.streetName}
+              </div>
             </div>
           </div>
         `;
@@ -2445,21 +2453,6 @@ const RiderMap = () => {
         </button>
       </div>
 
-      {/* Live Rides Viewer Button - show count of viewable rides */}
-      {viewableLiveRides.length > 0 && !liveRideActive && (
-        <div className="fixed right-4 top-80" style={{ zIndex: 10 }}>
-          <button
-            onClick={() => setShowLiveRidesPanel(true)}
-            className="p-3 bg-red-500/90 backdrop-blur rounded-xl shadow-xl relative"
-          >
-            <Eye size={20} className="text-white" />
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-neon-blue text-dark-bg text-xs font-bold rounded-full flex items-center justify-center">
-              {viewableLiveRides.length}
-            </span>
-          </button>
-        </div>
-      )}
-
       {/* Track Riders Button - always visible */}
       <div className="fixed right-4 top-[304px]" style={{ zIndex: 10 }}>
         <button
@@ -2501,6 +2494,64 @@ const RiderMap = () => {
             }}
             currentUser={{ uid: user?.uid, streetName: userProfile?.streetName, avatar: userProfile?.avatar }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Live Riders Sidebar - LEFT side */}
+      <AnimatePresence>
+        {viewableLiveRides.length > 0 && (
+          <motion.div
+            initial={{ x: -100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -100, opacity: 0 }}
+            className="fixed left-4 top-40 flex flex-col gap-2"
+            style={{ zIndex: 10 }}
+          >
+            {viewableLiveRides.map(ride => (
+              <motion.div
+                key={ride.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-2"
+              >
+                <div
+                  className="bg-dark-card/90 backdrop-blur-lg rounded-full px-3 py-2 flex items-center gap-2 border border-hot-orange/30 shadow-lg cursor-pointer"
+                  onClick={() => {
+                    // Center map on this rider
+                    if (map.current && ride.currentPosition) {
+                      map.current.flyTo({
+                        center: [ride.currentPosition.longitude, ride.currentPosition.latitude],
+                        zoom: 15
+                      });
+                    }
+                  }}
+                >
+                  <div className="relative">
+                    <span className="text-2xl animate-pulse">🔥</span>
+                    <div className="absolute inset-0 blur-sm opacity-50">
+                      <span className="text-2xl">🔥</span>
+                    </div>
+                  </div>
+                  <span className="text-white font-medium text-sm">{ride.streetName}</span>
+                  <div className="flex items-center gap-1 relative">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <div className="absolute w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Hide this rider from the list temporarily
+                      setViewableLiveRides(prev => prev.filter(r => r.id !== ride.id));
+                    }}
+                    className="p-1 text-gray-400 hover:text-white rounded-full hover:bg-dark-surface transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
         )}
       </AnimatePresence>
 
