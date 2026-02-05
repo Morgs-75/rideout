@@ -1735,19 +1735,143 @@ const RiderMap = () => {
     });
   };
 
+  // Generate a static ride image (fallback for iOS)
+  const generateRideImage = async (rideData) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 600;
+      const ctx = canvas.getContext('2d');
+
+      const pathPoints = rideData.pathPoints || [];
+
+      // Dark background
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(0, 0, 600, 600);
+
+      if (pathPoints.length >= 2) {
+        const sortedPoints = [...pathPoints].sort((a, b) => a.time - b.time);
+
+        // Calculate bounds
+        let minLat = Infinity, maxLat = -Infinity;
+        let minLng = Infinity, maxLng = -Infinity;
+        sortedPoints.forEach(p => {
+          minLat = Math.min(minLat, p.lat);
+          maxLat = Math.max(maxLat, p.lat);
+          minLng = Math.min(minLng, p.lng);
+          maxLng = Math.max(maxLng, p.lng);
+        });
+
+        const latPad = (maxLat - minLat) * 0.15 || 0.01;
+        const lngPad = (maxLng - minLng) * 0.15 || 0.01;
+        minLat -= latPad; maxLat += latPad;
+        minLng -= lngPad; maxLng += lngPad;
+
+        const toCanvas = (lat, lng) => ({
+          x: ((lng - minLng) / (maxLng - minLng)) * 560 + 20,
+          y: 580 - ((lat - minLat) / (maxLat - minLat)) * 560
+        });
+
+        // Draw full trail glow
+        ctx.beginPath();
+        const start = toCanvas(sortedPoints[0].lat, sortedPoints[0].lng);
+        ctx.moveTo(start.x, start.y);
+        for (let i = 1; i < sortedPoints.length; i++) {
+          const p = toCanvas(sortedPoints[i].lat, sortedPoints[i].lng);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.strokeStyle = 'rgba(255, 100, 0, 0.3)';
+        ctx.lineWidth = 20;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255, 150, 0, 0.6)';
+        ctx.lineWidth = 10;
+        ctx.stroke();
+
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Start point (green)
+        const startPt = toCanvas(sortedPoints[0].lat, sortedPoints[0].lng);
+        ctx.beginPath();
+        ctx.arc(startPt.x, startPt.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#39FF14';
+        ctx.fill();
+
+        // End point (blue)
+        const endPt = toCanvas(sortedPoints[sortedPoints.length - 1].lat, sortedPoints[sortedPoints.length - 1].lng);
+        ctx.beginPath();
+        ctx.arc(endPt.x, endPt.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = '#00D4FF';
+        ctx.fill();
+      }
+
+      // Stats overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, 10, 180, 70);
+      ctx.fillStyle = '#00D4FF';
+      ctx.font = 'bold 16px system-ui';
+      ctx.fillText('LIVERIDE', 20, 35);
+      ctx.fillStyle = '#fff';
+      ctx.font = '14px system-ui';
+      const distKm = rideData.totalDistanceKm?.toFixed(1) || '0.0';
+      const mins = rideData.durationMinutes || 0;
+      ctx.fillText(`${distKm} km · ${mins} min`, 20, 58);
+
+      canvas.toBlob(resolve, 'image/jpeg', 0.9);
+    });
+  };
+
+  // Check if video recording is supported
+  const isVideoSupported = () => {
+    if (typeof MediaRecorder === 'undefined') return false;
+    try {
+      return MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ||
+             MediaRecorder.isTypeSupported('video/webm');
+    } catch {
+      return false;
+    }
+  };
+
   // Handle posting the ride video
   const handlePostRideVideo = async () => {
     if (!completedRideData || !user) return;
 
     setGeneratingVideo(true);
     try {
-      // Generate the video
-      const videoBlob = await generateRideVideo(completedRideData);
+      let mediaUrl, mediaType;
 
-      // Upload to Firebase Storage
-      const videoRef = ref(storage, `liverides/${user.uid}/${Date.now()}.webm`);
-      await uploadBytes(videoRef, videoBlob);
-      const videoUrl = await getDownloadURL(videoRef);
+      // Check if video is supported and we have enough path points
+      const canMakeVideo = isVideoSupported() && (completedRideData.pathPoints?.length || 0) >= 2;
+
+      if (canMakeVideo) {
+        try {
+          // Try to generate video
+          const videoBlob = await generateRideVideo(completedRideData);
+          const videoRef = ref(storage, `liverides/${user.uid}/${Date.now()}.webm`);
+          await uploadBytes(videoRef, videoBlob);
+          mediaUrl = await getDownloadURL(videoRef);
+          mediaType = 'video';
+        } catch (videoError) {
+          console.log('Video generation failed, falling back to image:', videoError);
+          // Fall back to image
+          const imageBlob = await generateRideImage(completedRideData);
+          const imageRef = ref(storage, `liverides/${user.uid}/${Date.now()}.jpg`);
+          await uploadBytes(imageRef, imageBlob);
+          mediaUrl = await getDownloadURL(imageRef);
+          mediaType = 'image';
+        }
+      } else {
+        // Generate image instead
+        const imageBlob = await generateRideImage(completedRideData);
+        const imageRef = ref(storage, `liverides/${user.uid}/${Date.now()}.jpg`);
+        await uploadBytes(imageRef, imageBlob);
+        mediaUrl = await getDownloadURL(imageRef);
+        mediaType = 'image';
+      }
 
       // Create the post
       const distKm = completedRideData.totalDistanceKm?.toFixed(1) || '0.0';
@@ -1756,8 +1880,8 @@ const RiderMap = () => {
         userId: user.uid,
         streetName: userProfile?.streetName || 'Rider',
         userAvatar: userProfile?.avatar || '',
-        mediaType: 'video',
-        mediaUrl: videoUrl,
+        mediaType,
+        mediaUrl,
         caption: `Just finished a LiveRide! ${distKm} km in ${mins} minutes 🔥 #liveride #rideout`,
         hashtags: ['liveride', 'rideout'],
         likes: 0,
