@@ -1,5 +1,5 @@
-// Service Worker v1.6.4 - Phone number required for new signups
-const VERSION = '1.6.4';
+// Service Worker v1.8.9 - Fix text post square display on iPhone
+const VERSION = '1.8.9';
 
 self.addEventListener('install', (event) => {
   // Take control immediately

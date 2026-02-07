@@ -18,84 +18,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-// Demo ride announcements
-const DEMO_RIDES = [
-  {
-    id: 'ride-1',
-    title: 'Night City Loop',
-    description: 'Join us for an epic night ride through the city. We\'ll hit all the best spots and end at the usual meetup.',
-    organizer: { id: 'u1', name: 'ThunderVolt', avatar: '' },
-    date: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
-    time: '21:00',
-    meetingPoint: 'Central Station, East Exit',
-    estimatedDistance: '25 km',
-    estimatedDuration: '2 hours',
-    difficulty: 'Medium',
-    maxRiders: 15,
-    responses: {
-      going: [
-        { id: 'u2', name: 'SilentStorm' },
-        { id: 'u3', name: 'NightWatt' },
-        { id: 'u4', name: 'ElectroGhost' },
-        { id: 'u5', name: 'VoltageKing' },
-      ],
-      maybe: [
-        { id: 'u6', name: 'WattWarrior' },
-      ],
-      declined: []
-    },
-    comments: 5,
-    createdAt: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'ride-2',
-    title: 'Weekend Trail Blast',
-    description: 'Hitting the off-road trails this Saturday. Bring your A-game and make sure your battery is fully charged!',
-    organizer: { id: 'u2', name: 'SilentStorm', avatar: '' },
-    date: new Date(Date.now() + 86400000 * 4).toISOString(), // 4 days from now
-    time: '10:00',
-    meetingPoint: 'Forest Park Entrance',
-    estimatedDistance: '40 km',
-    estimatedDuration: '3 hours',
-    difficulty: 'Hard',
-    maxRiders: 10,
-    responses: {
-      going: [
-        { id: 'u1', name: 'ThunderVolt' },
-        { id: 'u7', name: 'SparkRider' },
-      ],
-      maybe: [
-        { id: 'u3', name: 'NightWatt' },
-        { id: 'u8', name: 'JoltMaster' },
-      ],
-      declined: []
-    },
-    comments: 12,
-    createdAt: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: 'ride-3',
-    title: 'Beginner Friendly Cruise',
-    description: 'New to the crew? This one\'s for you! Easy pace, scenic route, and plenty of stops. All skill levels welcome.',
-    organizer: { id: 'u3', name: 'NightWatt', avatar: '' },
-    date: new Date(Date.now() + 86400000 * 7).toISOString(), // 7 days from now
-    time: '14:00',
-    meetingPoint: 'Riverside Plaza',
-    estimatedDistance: '15 km',
-    estimatedDuration: '1.5 hours',
-    difficulty: 'Easy',
-    maxRiders: 20,
-    responses: {
-      going: [
-        { id: 'u9', name: 'PowerSlide' },
-      ],
-      maybe: [],
-      declined: []
-    },
-    comments: 3,
-    createdAt: new Date(Date.now() - 172800000).toISOString()
-  }
-];
+// Ride announcements - starts empty, users create their own
+const DEMO_RIDES = [];
 
 const RideAnnouncements = () => {
   const { user, userProfile } = useAuth();

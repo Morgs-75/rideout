@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Grid, MessageCircle, UserPlus, UserMinus, MapPin, Zap, TrendingUp } from 'lucide-react';
+import { Settings, Grid, MessageCircle, UserPlus, UserMinus, MapPin, Zap, TrendingUp, MoreVertical, Ban, Flag } from 'lucide-react';
 import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, deleteDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { getUserPoints } from '../services/pointsService';
 import { getTier, getProgressToNextTier, getNextTier, formatPoints } from '../config/gamification';
+import { blockUser, isUserBlocked } from '../services/blockService';
+import ReportModal from '../components/ReportModal';
 
 const Profile = () => {
   const { userId } = useParams();
@@ -18,6 +20,10 @@ const Profile = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [userPoints, setUserPoints] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const isOwnProfile = user?.uid === userId;
 
@@ -25,8 +31,35 @@ const Profile = () => {
     fetchProfile();
     fetchPosts();
     fetchPoints();
-    if (!isOwnProfile && user) checkFollowStatus();
+    if (!isOwnProfile && user) {
+      checkFollowStatus();
+      checkBlockStatus();
+    }
   }, [userId, user]);
+
+  const checkBlockStatus = async () => {
+    try {
+      const blocked = await isUserBlocked(user.uid, userId);
+      setIsBlocked(blocked);
+    } catch (error) {
+      // Error checking block status
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!user || blockLoading) return;
+    setBlockLoading(true);
+    setShowMenu(false);
+    try {
+      await blockUser(user.uid, userId);
+      setIsBlocked(true);
+      navigate(-1);
+    } catch (error) {
+      // Error blocking user
+    } finally {
+      setBlockLoading(false);
+    }
+  };
 
   const fetchPoints = async () => {
     try {
@@ -102,7 +135,37 @@ const Profile = () => {
       <header className="sticky top-0 z-40 bg-dark-bg/95 backdrop-blur-lg border-b border-dark-border safe-top">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-semibold">{profile?.streetName || 'Profile'}</h1>
-          {isOwnProfile && <Link to="/settings" className="p-2 text-gray-400 hover:text-white"><Settings size={24} /></Link>}
+          {isOwnProfile ? (
+            <Link to="/settings" className="p-2 text-gray-400 hover:text-white"><Settings size={24} /></Link>
+          ) : (
+            <div className="relative">
+              <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-gray-400 hover:text-white">
+                <MoreVertical size={24} />
+              </button>
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-dark-card border border-dark-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={handleBlock}
+                      disabled={blockLoading}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-dark-surface transition-all text-red-500"
+                    >
+                      <Ban size={18} />
+                      <span>{isBlocked ? 'Blocked' : 'Block User'}</span>
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(false); setShowReportModal(true); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-dark-surface transition-all border-t border-dark-border"
+                    >
+                      <Flag size={18} />
+                      <span>Report User</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -203,6 +266,14 @@ const Profile = () => {
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <ReportModal
+          user={profile}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </div>
   );
 };
